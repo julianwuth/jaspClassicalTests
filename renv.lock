@@ -227,6 +227,17 @@
       ],
       "Hash": "1b2ca1972e3b00cd0bb5a98e16403028"
     },
+    "S7": {
+      "Package": "S7",
+      "Version": "0.2.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "utils"
+      ],
+      "Hash": "6a72e94a8c9be4ef719af3aa3628f2dc"
+    },
     "SparseM": {
       "Package": "SparseM",
       "Version": "1.84-2",
@@ -500,14 +511,14 @@
     },
     "cli": {
       "Package": "cli",
-      "Version": "3.6.5",
+      "Version": "3.6.6",
       "Source": "Repository",
       "Repository": "CRAN",
       "Requirements": [
         "R",
         "utils"
       ],
-      "Hash": "16850760556401a2eeb27d39bd11c9cb"
+      "Hash": "a73d822b669d443ff8de6928f9c49850"
     },
     "clipr": {
       "Package": "clipr",
@@ -947,14 +958,14 @@
     },
     "fs": {
       "Package": "fs",
-      "Version": "1.6.6",
+      "Version": "2.1.0",
       "Source": "Repository",
       "Repository": "CRAN",
       "Requirements": [
         "R",
         "methods"
       ],
-      "Hash": "7eb1e342eee7e0a7449c49cdaa526d39"
+      "Hash": "09278623bca442bc53b0940ffa2f6d87"
     },
     "gdtools": {
       "Package": "gdtools",
@@ -985,7 +996,24 @@
     "ggplot2": {
       "Package": "ggplot2",
       "Version": "4.0.2",
-      "Source": "Repository"
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "S7",
+        "cli",
+        "grDevices",
+        "grid",
+        "gtable",
+        "isoband",
+        "lifecycle",
+        "rlang",
+        "scales",
+        "stats",
+        "vctrs",
+        "withr"
+      ],
+      "Hash": "24744d322a00a520db329287bf02ce42"
     },
     "gld": {
       "Package": "gld",
@@ -1230,7 +1258,7 @@
       "RemoteUsername": "jasp-stats",
       "RemoteRepo": "jaspBase",
       "RemoteRef": "master",
-      "RemoteSha": "cfacdfc83bcbe6b1bb17ded6aab4be221ccbeed9",
+      "RemoteSha": "f1944101ee749e3fcd605defca2e014ade4b3534",
       "Remotes": "jasp-stats/jaspGraphs",
       "Requirements": [
         "R6",
@@ -1256,18 +1284,18 @@
         "systemfonts",
         "withr"
       ],
-      "Hash": "aeb14eb158084fa8f8c002cb1fa64d4c"
+      "Hash": "85a6215b86734f9f3184f796c802fb45"
     },
     "jaspFrequencies": {
       "Package": "jaspFrequencies",
-      "Version": "0.96.1",
+      "Version": "0.96.5",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "jasp-stats",
       "RemoteRepo": "jaspFrequencies",
       "RemoteRef": "master",
-      "RemoteSha": "6b2079c354e1fb4409a1cd595ace1fcb95316129",
+      "RemoteSha": "1ad41c180c3dcf41786c935b4f6920910e9e60e1",
       "Remotes": "jasp-stats/jaspBase, jasp-stats/jaspGraphs, vandenman/conting",
       "Requirements": [
         "BayesFactor",
@@ -1283,7 +1311,7 @@
         "stringr",
         "vcd"
       ],
-      "Hash": "c8eb39f51450e73615d43ae7e6832519"
+      "Hash": "8bb20c8bfaa4ae9f2e8ebac399b3e35a"
     },
     "jaspGraphs": {
       "Package": "jaspGraphs",
@@ -1294,7 +1322,7 @@
       "RemoteUsername": "jasp-stats",
       "RemoteRepo": "jaspGraphs",
       "RemoteRef": "master",
-      "RemoteSha": "5c68ba4b81afc55e2092e733fe334819c85e354a",
+      "RemoteSha": "aebeafe01da55d32d8ebd9cfe8a6241247d0a3b1",
       "Requirements": [
         "R6",
         "cli",
@@ -1308,18 +1336,18 @@
         "rlang",
         "scales"
       ],
-      "Hash": "a0d70e7e137846c4b4e42f79e2236217"
+      "Hash": "a8b55efc4a7dc195c3dbd5b1cda18d21"
     },
     "jaspTTests": {
       "Package": "jaspTTests",
-      "Version": "0.95.5",
+      "Version": "0.96.5",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "jasp-stats",
       "RemoteRepo": "jaspTTests",
       "RemoteRef": "master",
-      "RemoteSha": "a4c0b6d12e3912c263f86bdd0e95e63fd5c9e95c",
+      "RemoteSha": "30c95319e2a7b4280d7553a84e91242ddc183516",
       "Remotes": "jasp-stats/jaspBase, jasp-stats/jaspGraphs",
       "Requirements": [
         "BayesFactor",
@@ -1331,7 +1359,7 @@
         "plotrix",
         "plyr"
       ],
-      "Hash": "9114f22d1b8edf33491ad558aec93519"
+      "Hash": "c786be4c9e14542b499a8eb890713a91"
     },
     "jquerylib": {
       "Package": "jquerylib",
@@ -1419,16 +1447,15 @@
     },
     "lifecycle": {
       "Package": "lifecycle",
-      "Version": "1.0.4",
+      "Version": "1.0.5",
       "Source": "Repository",
       "Repository": "CRAN",
       "Requirements": [
         "R",
         "cli",
-        "glue",
         "rlang"
       ],
-      "Hash": "b8552d117e1b808b09a832f589b79035"
+      "Hash": "36dbfe4fba6c064db50a671a90297c85"
     },
     "lme4": {
       "Package": "lme4",
@@ -2088,14 +2115,14 @@
     },
     "rlang": {
       "Package": "rlang",
-      "Version": "1.1.6",
+      "Version": "1.3.0",
       "Source": "Repository",
       "Repository": "CRAN",
       "Requirements": [
         "R",
         "utils"
       ],
-      "Hash": "892124978869b74935dc3934c42bfe5a"
+      "Hash": "8d05afdb0b0dd5ef01b306db289fe21f"
     },
     "rmarkdown": {
       "Package": "rmarkdown",

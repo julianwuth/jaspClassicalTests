@@ -103,6 +103,14 @@ Form
         CheckBox { name: "boxPlot"; label: qsTr("Box plot"); info: qsTr("Box plot of the dependent variable across groups.") }
         CheckBox { name: "varRatioPlot"; label: qsTr("Variance ratio plot (2 groups)"); info: qsTr("Plot of the variance ratio with confidence interval (F-test based, 2 groups only).") }
         CheckBox { name: "varEstimatePlot"; label: qsTr("Variance estimate plot"); info: qsTr("Plot of the variance estimates with confidence intervals.") }
+
+        CheckBox
+        {
+            name: "rainCloudPlot"
+            label: qsTr("Raincloud plot (demeaned)")
+            info: qsTr("Raincloud plot of the group-demeaned values: each group is centered at mean 0 while its variance is preserved, so the plot compares the spread of the groups.")
+            CheckBox { name: "rainCloudPlotHorizontal"; label: qsTr("Horizontal display"); info: qsTr("Changes the orientation of the raincloud plot.") }
+        }
     }
 
 }

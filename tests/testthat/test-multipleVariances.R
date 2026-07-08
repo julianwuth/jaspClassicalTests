@@ -125,11 +125,15 @@ test_that("Normality test (Shapiro-Wilk) table matches", {
   results <- jaspTools::runAnalysis("multipleVariances", "debug.csv", options)
   table   <- results[["results"]][["assumptionChecks"]][["collection"]][["assumptionChecks_normalityTest"]][["data"]]
   jaspTools::expect_equal_tables(table, list(
-    0.966386984270573, 0.0117758430505889, "contNormal"
+    0.915696014062066, "1", 0.0819021844894408, "contNormal",
+    0.956031076407404, "2", 0.467911256938122, "contNormal",
+    0.959450290686738, "3", 0.532926410776702, "contNormal",
+    0.949461949369392, "4", 0.358996514131298, "contNormal",
+    0.911517098559219, "5", 0.0681263561514011, "contNormal"
   ))
 })
 
-test_that("Q-Q plot is created", {
+test_that("Q-Q plots are created per group", {
   options <- .mvOptions()
   options$dependent  <- "contNormal"
   options$factor     <- "facFive"
@@ -138,6 +142,19 @@ test_that("Q-Q plot is created", {
   set.seed(1)
   results <- jaspTools::runAnalysis("multipleVariances", "debug.csv", options)
   skip_if(results$status == "fatalError", "jaspGraphs/ggplot2 version incompatibility")
-  plotData <- results[["results"]][["assumptionChecks"]][["collection"]][["assumptionChecks_qqPlots"]][["collection"]]
+  varColl <- results[["results"]][["assumptionChecks"]][["collection"]][["assumptionChecks_qqPlots"]][["collection"]][["assumptionChecks_qqPlots_contNormal"]][["collection"]]
+  expect_equal(length(varColl), 5)
+})
+
+test_that("Raincloud plot is created", {
+  options <- .mvOptions()
+  options$dependent     <- "contNormal"
+  options$factor        <- "facFive"
+  options$leveneTest    <- TRUE
+  options$rainCloudPlot  <- TRUE
+  set.seed(1)
+  results <- jaspTools::runAnalysis("multipleVariances", "debug.csv", options)
+  skip_if(results$status == "fatalError", "jaspGraphs/ggplot2 version incompatibility")
+  plotData <- results[["results"]][["summaryPlots"]][["collection"]][["summaryPlots_rainCloudPlot"]][["collection"]]
   expect_true(length(plotData) > 0)
 })

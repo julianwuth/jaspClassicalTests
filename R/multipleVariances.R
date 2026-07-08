@@ -16,7 +16,7 @@
 #
 
 #' @import jaspBase
-#' @importFrom stats bartlett.test var.test shapiro.test na.omit pchisq pf pnorm qchisq residuals aov sd uniroot var
+#' @importFrom stats bartlett.test var.test shapiro.test na.omit pchisq pf pnorm qchisq sd uniroot var ave
 #' @importFrom car leveneTest
 #' @export
 multipleVariances <- function(jaspResults, dataset, options, ...) {
@@ -41,7 +41,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   if (options[["varianceRatioCi"]])
     .createVarianceRatioTableMV(jaspResults, dataset, options, ready)
 
-  if (any(c(options[["boxPlot"]], options[["varRatioPlot"]], options[["varEstimatePlot"]])))
+  if (any(c(options[["boxPlot"]], options[["varRatioPlot"]], options[["varEstimatePlot"]], options[["rainCloudPlot"]])))
     .createSummaryPlotContainerMV(jaspResults, dataset, options, ready)
 
   .assumptionChecksMV(jaspResults, dataset, options, ready)
@@ -60,7 +60,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 
   outputTable$addColumnInfo(name = "var",   title = gettext("Variable"),  type = "string")
   outputTable$addColumnInfo(name = "test",  title = gettext("Test"),      type = "string")
-  outputTable$addColumnInfo(name = "stat",  title = gettext("Statistic"), type = "number")
+  outputTable$addColumnInfo(name = "stat",  title = gettext("Statistic"), type = "number", format = "dp:3")
   outputTable$addColumnInfo(name = "df1",   title = gettext("df1"),       type = "integer")
   outputTable$addColumnInfo(name = "df2",   title = gettext("df2"),       type = "integer")
   outputTable$addColumnInfo(name = "p",     title = gettext("p"),         type = "pvalue")
@@ -555,11 +555,14 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   normalityTable$dependOn("normalityTest")
   jaspResults[["assumptionChecks"]][["normalityTest"]] <- normalityTable
 
-  normalityTable$addColumnInfo(name = "varName", title = gettext("Residuals"), type = "string")
-  normalityTable$addColumnInfo(name = "W",       title = gettext("W"),         type = "number")
-  normalityTable$addColumnInfo(name = "pValue",  title = gettext("p"),         type = "pvalue")
+  normalityTable$addColumnInfo(name = "varName", title = gettext("Variable"), type = "string", combine = TRUE)
+  normalityTable$addColumnInfo(name = "group",   title = gettext("Group"),    type = "string")
+  normalityTable$addColumnInfo(name = "W",       title = gettext("W"),        type = "number")
+  normalityTable$addColumnInfo(name = "pValue",  title = gettext("p"),        type = "pvalue")
 
-  normalityTable$addFootnote(gettext("Significant results suggest a deviation from normality."))
+  normalityTable$showSpecifiedColumnsOnly <- TRUE
+
+  normalityTable$addFootnote(gettext("Normality is tested within each group. Significant results suggest a deviation from normality."))
 
   if (ready)
     .fillNormalityTestTableMV(normalityTable, dataset, options)
@@ -570,28 +573,40 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 .fillNormalityTestTableMV <- function(normalityTable, dataset, options) {
 
   factor <- as.factor(dataset[[options[["factor"]]]])
+  levels <- levels(factor)
 
-  resList <- lapply(options[["dependent"]], function(depName) {
+  rows          <- list()
+  smallGroupHit <- FALSE
 
+  for (depName in options[["dependent"]]) {
     y <- dataset[[depName]]
-    # TODO check if this is the right way to get residuals and check them
-    model <- aov(y ~ factor)
-    resids <- residuals(model)
 
-    swTest <- try(shapiro.test(resids), silent = TRUE)
+    for (lvl in levels) {
+      subY <- na.omit(y[factor == lvl & !is.na(factor)])
+      n    <- length(subY)
 
-    if (isTryError(swTest)) {
-      normalityTable$setError(as.character(swTest))
-      return(NULL)
+      # Shapiro-Wilk requires between 3 and 5000 observations
+      if (n < 3) {
+        rows[[length(rows) + 1]] <- list(varName = depName, group = lvl, W = NA, pValue = NA)
+        smallGroupHit <- TRUE
+        next
+      }
+
+      swTest <- try(shapiro.test(subY), silent = TRUE)
+      if (isTryError(swTest)) {
+        normalityTable$setError(as.character(swTest))
+        return()
+      }
+
+      rows[[length(rows) + 1]] <- list(varName = depName, group = lvl,
+                                       W = as.numeric(swTest$statistic), pValue = as.numeric(swTest$p.value))
     }
+  }
 
-    data.frame(varName = depName, W = as.numeric(swTest$statistic), pValue = as.numeric(swTest$p.value), stringsAsFactors = FALSE)
-  })
+  normalityTable$addRows(rows)
 
-  results <- do.call(rbind, resList)
-
-  if (!is.null(results))
-    normalityTable$setData(results)
+  if (smallGroupHit)
+    normalityTable$addFootnote(gettext("Groups with fewer than 3 observations are omitted from the test."))
 
   return()
 }
@@ -610,18 +625,32 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   jaspResults[["assumptionChecks"]][["qqPlots"]] <- qqContainer
 
   factor <- as.factor(dataset[[options[["factor"]]]])
+  levels <- levels(factor)
 
   for (depName in options[["dependent"]]) {
-    y <- dataset[[depName]]
-    model <- aov(y ~ factor)
-    resids <- residuals(model)
-    stdResids <- scale(resids)
+    varContainer <- createJaspContainer(title = gettext(depName))
+    qqContainer[[depName]] <- varContainer
 
-    tempPlot <- createJaspPlot(title = gettext(depName), height = 400, width = 500)
-    tempPlot$plotObject <- jaspGraphs::plotQQnorm(as.vector(stdResids),
-                                                  ciLevel = 0.95,
-                                                  yName = gettext("Standardized Residuals"))
-    qqContainer[[depName]] <- tempPlot
+    y <- dataset[[depName]]
+
+    for (lvl in levels) {
+      subY <- na.omit(y[factor == lvl & !is.na(factor)])
+
+      tempPlot <- createJaspPlot(title = lvl, height = 400, width = 500)
+      varContainer[[lvl]] <- tempPlot
+
+      # Standardize within the group so normality is assessed per group
+      if (length(subY) < 3 || sd(subY) == 0) {
+        tempPlot$setError(gettextf("Group %s has insufficient observations for a Q-Q plot.", lvl))
+        next
+      }
+
+      stdY <- as.vector(scale(subY))
+      tempPlot$plotObject <- jaspGraphs::plotQQnorm(stdY,
+                                                    ciLevel = 0.95,
+                                                    yName = gettext("Standardized Observations"),
+                                                    xName = gettext("Theoretical Quantiles"))
+    }
   }
 
   return()
@@ -643,6 +672,53 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 
   if (options[["varEstimatePlot"]])
     .varEstimatePlotMV(jaspResults, dataset, options, ready)
+
+  if (options[["rainCloudPlot"]])
+    .rainCloudPlotMV(jaspResults, dataset, options, ready)
+
+  return()
+}
+
+.rainCloudPlotMV <- function(jaspResults, dataset, options, ready) {
+  if (!is.null(jaspResults[["summaryPlots"]][["rainCloudPlot"]]))
+    return()
+
+  rainContainer <- createJaspContainer(title = gettext("Raincloud Plot (Demeaned)"))
+  rainContainer$dependOn(c("rainCloudPlot", "rainCloudPlotHorizontal"))
+  jaspResults[["summaryPlots"]][["rainCloudPlot"]] <- rainContainer
+
+  if (!ready)
+    return()
+
+  factorName <- options[["factor"]]
+  factor     <- as.factor(dataset[[factorName]])
+  horiz      <- options[["rainCloudPlotHorizontal"]]
+
+  for (depName in options[["dependent"]]) {
+    tempPlot <- createJaspPlot(title = gettext(depName), height = 320, width = 480)
+    rainContainer[[depName]] <- tempPlot
+
+    plotDat <- na.omit(data.frame(y = dataset[[depName]], group = factor))
+    if (nrow(plotDat) == 0) {
+      tempPlot$setError(gettextf("%s has no observations after removing missing values.", depName))
+      next
+    }
+
+    # Demean within each group: preserve variance, set every group mean to 0
+    plotDat$y <- ave(plotDat$y, plotDat$group, FUN = function(z) z - mean(z))
+
+    # Reuse the shared raincloud implementation from jaspTTests
+    names(plotDat) <- c(depName, factorName)
+    p <- try(jaspTTests:::.descriptivesPlotsRainCloudFill(plotDat, depName, factorName,
+                                                          yLabel = depName, xLabel = factorName,
+                                                          addLines = FALSE, horiz = horiz, testValue = NULL))
+    if (isTryError(p)) {
+      tempPlot$setError(as.character(p))
+      next
+    }
+
+    tempPlot$plotObject <- p
+  }
 
   return()
 }
