@@ -155,30 +155,65 @@ Form
 			}
 		}
 	}
+    
+    Group 
+    {
+        title: qsTr("Test Target")
 
-	RadioButtonGroup
-	{
-		name:    "testTarget"
-		title:   qsTr("Test Target")
-		columns: 2
+        RadioButtonGroup
+        {
+            name:    "testTarget"
+            columns: 2
 
-		RadioButton
-		{
-			value: "ratio"
-			label: qsTr("Ratio")
-			id:    targetRatio
-			info:  qsTr("Test the ratio of the two rates.")
-		}
+            RadioButton
+            {
+                value: "ratio"
+                label: qsTr("Ratio")
+                id:    targetRatio
+                info:  qsTr("Test the ratio of the two rates.")
+            }
 
-		RadioButton
-		{
-			value:   "difference"
-			label:   qsTr("Difference")
-			checked: true
-			id:      targetDifference
-			info:    qsTr("Test the difference between the two rates.")
-		}
-	}
+            RadioButton
+            {
+                value:   "difference"
+                label:   qsTr("Difference")
+                checked: true
+                id:      targetDifference
+                info:    qsTr("Test the difference between the two rates.")
+            }
+                        
+        }
+
+        Group
+        {
+            CheckBox
+            {
+                name:              "ratioCi"
+                label:             qsTr("Confidence interval")
+                id:                ratioCi
+                childrenOnSameRow: true
+                info:              qsTr("Confidence interval for the effect (ratio or difference).")
+
+                CIField { name: "confLevel" }
+                
+            }
+
+            RadioButtonGroup
+            {
+                name:                  "ciMethod"
+                title:                 qsTr("Method")
+                enabled:               ratioCi.checked
+                visible:               targetRatio.checked
+                radioButtonsOnSameRow: true
+                indent:                true
+
+                RadioButton { value: "exact";  label: qsTr("Exact");               checked: true }
+                RadioButton { value: "normal"; label: qsTr("Normal approximation") }
+            }
+        }
+    
+    }
+	
 
 	Group
 	{
@@ -281,29 +316,6 @@ Form
 
 				CIField { name: "descriptiveConfLevel" }
 			}
-		}
-
-		CheckBox
-		{
-			name:              "ratioCi"
-			label:             qsTr("Confidence interval")
-			id:                ratioCi
-			childrenOnSameRow: true
-			info:              qsTr("Confidence interval for the effect (ratio or difference).")
-
-			CIField { name: "confLevel" }
-		}
-
-		RadioButtonGroup
-		{
-			name:                  "ciMethod"
-			title:                 qsTr("Method")
-			enabled:               ratioCi.checked
-			visible:               targetRatio.checked
-			radioButtonsOnSameRow: true
-
-			RadioButton { value: "exact";  label: qsTr("Exact");               checked: true }
-			RadioButton { value: "normal"; label: qsTr("Normal approximation") }
 		}
 	}
 }

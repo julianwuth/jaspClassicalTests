@@ -186,7 +186,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   outputTable$addColumnInfo(name = "pValue", title = gettext("p"), type = "pvalue")
 
   if (options[["ratioCi"]]) {
-    ciTitle <- gettextf("%i%% CI for %s", as.integer(options[["confLevel"]] * 100), ciEffectName)
+    ciTitle <- gettextf("%i%% CI on %s", as.integer(options[["confLevel"]] * 100), ciEffectName)
     outputTable$addColumnInfo(name = "ciLower", title = gettext("Lower"), type = "number",
                               overtitle = ciTitle)
     outputTable$addColumnInfo(name = "ciUpper", title = gettext("Upper"), type = "number",
@@ -268,7 +268,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   }
 
   outputTable$addFootnote(
-    gettextf("Group 1: %1$s. Group 2: %2$s.", g1$name, g2$name)
+    gettextf("Group 1 = %1$s; Group 2 = %2$s.", g1$name, g2$name)
   )
 
   return()
