@@ -17,13 +17,13 @@ Description
 
 	GroupTitle
 	{
-		title: qsTr("Mean")
+		title: qsTr("Means")
 	}
 
 	Analysis
 	{
-		title: qsTr("One Sample Tests") // Title for window
-		menu: qsTr("One Sample Tests")  // Title for ribbon
+		title: qsTr("One Mean") // Title for window
+		menu: qsTr("One Mean")  // Title for ribbon
 		func: "oneSampleTests"           // Function to be called
 		qml: "oneSampleTests.qml"               // Design input window
 		requiresData: true                
@@ -32,8 +32,8 @@ Description
 
 	Analysis
 	{
-		title: qsTr("Independent Samples Tests") // Title for window
-		menu: qsTr("Independent Samples Tests")  // Title for ribbon
+		title: qsTr("Two Independent Means") // Title for window
+		menu: qsTr("Two Independent Means")  // Title for ribbon
 		func: "independentSamplesTests"           // Function to be called
 		qml: "independentSamplesTests.qml"               // Design input window
 		requiresData: true                
@@ -41,8 +41,8 @@ Description
 
 	Analysis
 	{
-		title: qsTr("Paired Samples Tests") // Title for window
-		menu: qsTr("Paired Samples Tests")  // Title for ribbon
+		title: qsTr("Two Dependent Means") // Title for window
+		menu: qsTr("Two Dependent Means")  // Title for ribbon
 		func: "pairedSamplesTests"           // Function to be called
 		qml: "pairedSamplesTests.qml"               // Design input window
 		requiresData: true                
@@ -52,13 +52,13 @@ Description
 
 	GroupTitle
 	{
-		title: qsTr("Proportion")
+		title: qsTr("Proportions")
 	}
 
 	Analysis
 	{
-		title: qsTr("Single Proportion") // Title for window
-		menu: qsTr("Single Proportion")  // Title for ribbon
+		title: qsTr("One Proportion") // Title for window
+		menu: qsTr("One Proportion")  // Title for ribbon
 		func: "singleProportion"           // Function to be called
 		qml: "singleProportion.qml"               // Design input window
 		requiresData: true                
@@ -77,13 +77,13 @@ Description
 
 	GroupTitle
 	{
-		title: qsTr("Rate")
+		title: qsTr("Rates")
 	}
 
 	Analysis
 	{
-		title:        qsTr("One Sample Poisson Rate")
-		menu:         qsTr("One Sample Poisson Rate")
+		title:        qsTr("One Rate")
+		menu:         qsTr("One Rate")
 		func:         "oneSamplePoissonRate"
 		qml:          "oneSamplePoissonRate.qml"
 		requiresData: false
@@ -91,8 +91,8 @@ Description
 
 	Analysis
 	{
-		title:        qsTr("Two Sample Poisson Rate")
-		menu:         qsTr("Two Sample Poisson Rate")
+		title:        qsTr("Two Rates")
+		menu:         qsTr("Two Rates")
 		func:         "twoSamplePoissonRate"
 		qml:          "twoSamplePoissonRate.qml"
 		requiresData: false
@@ -102,13 +102,13 @@ Description
 
 	GroupTitle
 	{
-		title: qsTr("Variance")
+		title: qsTr("Variances")
 	}
 
 	Analysis
 	{
-		title: qsTr("Single Variance") // Title for window
-		menu: qsTr("Single Variance")  // Title for ribbon
+		title: qsTr("One Variance") // Title for window
+		menu: qsTr("One Variance")  // Title for ribbon
 		func: "singleVariance"           // Function to be called
 		qml: "singleVariance.qml"               // Design input window
 		requiresData: true                
