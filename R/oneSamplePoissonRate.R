@@ -69,7 +69,7 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
 
   outputTable$addColumnInfo(name = "method",  title = gettext("Method"),      type = "string")
   outputTable$addColumnInfo(name = "events",  title = gettext("Occurrences"), type = "integer")
-  outputTable$addColumnInfo(name = "time",    title = gettext("N"),           type = "number")
+  outputTable$addColumnInfo(name = "time",    title = gettext("Interval"),           type = "number")
   outputTable$addColumnInfo(name = "rate",    title = gettext("Rate"),        type = "number")
 
   if (options[["normalApprox"]])
@@ -182,7 +182,7 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
   )
 
   row <- data.frame(
-    method    = gettext("Normal approximation"),
+    method    = gettext("Normal approx."),
     events    = as.integer(events),
     time      = time,
     rate      = rate,
