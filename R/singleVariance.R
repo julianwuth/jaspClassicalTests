@@ -185,7 +185,8 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
     tempPlot <- createJaspPlot(title = gettext(colnames(dataset)[i]), height = 400, width = 500)
     tempPlot$plotObject <- jaspGraphs::plotQQnorm(as.vector(scale(tempDat)), # as.vector extracts the standardized values
                                                   ciLevel = 0.95,
-                                                  yName = "Standardized Residuals") # TODO this does not match the results from other modules
+                                                  yName = "Standardized Residuals",
+                                                  xName = "Theoretical Quantiles") # TODO this does not match the results from other modules
     qqContainer[[colnames(dataset)[i]]] <- tempPlot
   }
 
