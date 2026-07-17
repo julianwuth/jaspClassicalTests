@@ -120,6 +120,40 @@ Description
 		menu: qsTr("Multiple Variances")  // Title for ribbon
 		func: "multipleVariances"           // Function to be called
 		qml: "multipleVariances.qml"               // Design input window
-		requiresData: true                
+		requiresData: true
+	}
+
+	Separator{}
+
+	GroupTitle
+	{
+		title: qsTr("Correlations")
+	}
+
+	Analysis
+	{
+		title: qsTr("One Correlation") // Title for window
+		menu: qsTr("One Correlation")  // Title for ribbon
+		func: "oneCorrelation"           // Function to be called
+		qml: "oneCorrelation.qml"               // Design input window
+		requiresData: true
+	}
+
+	Analysis
+	{
+		title: qsTr("Two Correlations") // Title for window
+		menu: qsTr("Two Correlations")  // Title for ribbon
+		func: "twoCorrelations"           // Function to be called
+		qml: "twoCorrelations.qml"               // Design input window
+		requiresData: true
+	}
+
+	Analysis
+	{
+		title: qsTr("> 2 Correlations") // Title for window
+		menu: qsTr("> 2 Correlations")  // Title for ribbon
+		func: "multipleCorrelations"           // Function to be called
+		qml: "multipleCorrelations.qml"               // Design input window
+		requiresData: true
 	}
 }

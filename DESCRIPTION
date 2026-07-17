@@ -16,10 +16,11 @@ Imports:
     jaspGraphs,
     jaspTTests
 Suggests:
-  testthat
-Remotes: 
+  testthat,
+  jaspRegression
+Remotes:
     jasp-stats/jaspBase,
     jasp-stats/jaspGraphs,
     jasp-stats/jaspTTests,
     jasp-stats/jaspFrequencies
-RoxygenNote: 7.3.3
+Config/roxygen2/version: 8.0.0
