@@ -19,17 +19,35 @@
 #' @export
 singleVariance <- function(jaspResults, dataset, options, ...) {
   # is ready if test is selected and data was provided
-  ready <- (ncol(dataset) > 0 && options[["chiSquareTest"]])
-
-  if (ready)
-    .hasErrors(dataset, type = c('infinity', 'variance'),
-               all.target = options[["dependent"]], variance.equalTo = 0,
-               exitAnalysisIfErrors = TRUE)
+  if (options[["inputType"]] == "rawData") {
+    ready <- (ncol(dataset) > 0 && options[["chiSquareTest"]])
+    if (ready)
+      .hasErrors(dataset, type = c('infinity', 'variance'),
+                 all.target = options[["dependent"]], variance.equalTo = 0,
+                 exitAnalysisIfErrors = TRUE)
+  } else {
+    ready <- options[["chiSquareTest"]]
+  }
 
   .createOutputTableSV(jaspResults, dataset, options, ready)
-  .assumptionChecksSV(jaspResults, dataset, options, ready)
+
+  # assumption checks require raw data
+  if (options[["inputType"]] == "rawData")
+    .assumptionChecksSV(jaspResults, dataset, options, ready)
 
   return()
+}
+
+# Normalize both input types to a list of per-variable summaries: list(name, n, variance)
+.getVarianceDataSV <- function(dataset, options) {
+  if (options[["inputType"]] == "rawData") {
+    return(lapply(colnames(dataset), function(colname) {
+      col <- na.omit(dataset[[colname]])
+      list(name = colname, n = length(col), variance = if (length(col) > 1) var(col) else NA_real_)
+    }))
+  }
+
+  return(list(list(name = "", n = options[["sampleSize"]], variance = options[["sampleVariance"]])))
 }
 
 .createOutputTableSV <- function(jaspResults, dataset, options, ready) {
@@ -38,7 +56,8 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 
   outputTable <- createJaspTable(title = gettext("Single Variance Test"))
   outputTable$dependOn(c("alternative", "chiSquareTest", "ciMethod", "confLevel", "dependent",
-                         "sdEstimate", "testVariance", "varEstimate", "varianceCi"))
+                         "sdEstimate", "testVariance", "varEstimate", "varianceCi",
+                         "inputType", "sampleVariance", "sampleSize"))
   jaspResults[["outputTable"]] <- outputTable
 
   outputTable$addColumnInfo(name = "varName",   title = gettext("Variable"),          type = "string")
@@ -71,15 +90,17 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 
 .fillOutputTableSV <- function(outputTable, dataset, options) {
 
-  resSV <- sapply(colnames(dataset), .computeSVTest,
-                  options = options, outputTable = outputTable,
-                  dataset = dataset, simplify = FALSE)
+  varData <- .getVarianceDataSV(dataset, options)
 
-  if (is.null(resSV)) # happens if an error occurred during computation
+  resList <- lapply(varData, .computeSVTest,
+                    options = options, outputTable = outputTable, dataset = dataset)
+
+  keep <- !vapply(resList, is.null, logical(1))
+  if (!any(keep)) # happens if all entries failed / had too few observations
     return()
 
-  res <- do.call(rbind.data.frame, resSV)
-  res$varName <- row.names(res) # variable names are row names of the data frame
+  res <- do.call(rbind.data.frame, resList[keep])
+  res$varName <- vapply(varData[keep], `[[`, character(1), "name")
   outputTable$setData(res)
 
   # add footnote describing the hypothesis
@@ -94,12 +115,21 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
   return()
 }
 
+# Build a sample with exactly the requested size and variance so the summarized
+# input runs through the same VarTest/VarCI code path as raw data.
+.syntheticSampleSV <- function(n, variance) {
+  z <- seq_len(n) - (n + 1) / 2 # centered sequence
+  z / sd(z) * sqrt(variance)
+}
 
-.computeSVTest <- function(colname, options, outputTable, dataset) {
-  col <- na.omit(dataset[[colname]])
+.computeSVTest <- function(entry, options, outputTable, dataset) {
+  if (options[["inputType"]] == "rawData")
+    col <- na.omit(dataset[[entry[["name"]]]])
+  else
+    col <- .syntheticSampleSV(entry[["n"]], entry[["variance"]])
 
-  if(length(col) < 2) {
-    outputTable$addFootnote(gettextf("%s has too few observations after removing missing values.", colname),
+  if (length(col) < 2) {
+    outputTable$addFootnote(gettextf("%s has too few observations after removing missing values.", entry[["name"]]),
                             symbol = gettext("<b>Warning:</b>"))
     return(NULL)
   }
@@ -111,7 +141,7 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
                                 conf.level = options$confLevel), silent = TRUE)
   if (isTryError(out)) {
     outputTable$setError(gettext(as.character(out)))
-    return()
+    return(NULL)
   }
 
   varEst <- out$estimate
@@ -120,7 +150,10 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
   pValue <- out$p.value
   df <- out$parameter[1]
 
-  if (options$ciMethod == 'chiSquare') {
+  # Bonett CI needs the raw values (kurtosis); force chi-square method for summarized input
+  useBonett <- options[["ciMethod"]] == "bonett" && options[["inputType"]] == "rawData"
+
+  if (!useBonett) {
     ciLower <- out$conf.int[1]
     ciUpper <- out$conf.int[2]
   } else { # Bonett method
@@ -128,7 +161,7 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
                                   sides = .getSidesCi(options)), silent = TRUE)
     if (isTryError(ciRes)) {
       outputTable$setError(gettext(as.character(ciRes)))
-      return()
+      return(NULL)
     }
 
     ciLower <- ciRes["lwr.ci"]

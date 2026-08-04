@@ -25,13 +25,63 @@ Form
 {
     // TODO add info here for help file
 
+    RadioButtonGroup
+    {
+        name:    "inputType"
+        title:   qsTr("Input")
+        columns: 2
+
+        RadioButton
+        {
+            value:   "rawData"
+            label:   qsTr("Raw data")
+            checked: true
+            id:      inputRawData
+        }
+
+        RadioButton
+        {
+            value: "summarized"
+            label: qsTr("Summarized data")
+            id:    inputSummarized
+        }
+    }
+
     VariablesForm
 	{
 		infoLabel: qsTr("Input")
 		preferredHeight: jaspTheme.smallDefaultVariablesFormHeight
+		enabled: inputRawData.checked
 		AvailableVariablesList { name: "allVariablesList" }
 		AssignedVariablesList { name: "dependent"; title: qsTr("Variables"); info: qsTr("In this box the dependent variable is selected.") ; allowedColumns: ["scale"]; minNumericLevels: 2 }
-	} 
+	}
+
+    Group
+    {
+        title:   qsTr("Summarized data")
+        enabled: inputSummarized.checked
+        columns: 2
+
+        DoubleField
+        {
+            name:         "sampleVariance"
+            label:        qsTr("Sample variance")
+            defaultValue: 1
+            min:          0
+            inclusive:    JASP.MaxOnly
+            decimals:     3
+            info:         qsTr("The observed sample variance.")
+        }
+
+        IntegerField
+        {
+            name:         "sampleSize"
+            label:        qsTr("Sample size")
+            defaultValue: 2
+            min:          2
+            info:         qsTr("The number of observations the sample variance is based on.")
+        }
+    }
 
     Group 
     {
@@ -100,8 +150,9 @@ Form
             {
                 name: "ciMethod"
                 title: qsTr("Method")
-                enabled: varianceCi.checked
+                enabled: varianceCi.checked && inputRawData.checked
                 radioButtonsOnSameRow: true
+                info: qsTr("Method for the confidence interval. Bonett's method needs the raw observations (it relies on the sample kurtosis), so with summarized data only the χ² interval is available and the method cannot be changed.")
                 RadioButton { value: "chiSquare"; label: qsTr("χ²") ; checked: true }
                 RadioButton { value: "bonett"; label: qsTr("Bonett") }
             }
@@ -118,6 +169,7 @@ Form
     Group
 	{
 		title: qsTr("Assumption checks")
+		enabled: inputRawData.checked
 		CheckBox { name: "normalityTest"; label: qsTr("Normality"); info: qsTr("Shapiro-Wilk test of normality.") }
 		CheckBox { name: "qqPlot";		 	label: qsTr("Q-Q plot residuals"); info: qsTr("Q-Q plot of the standardized residuals.") }
 	}

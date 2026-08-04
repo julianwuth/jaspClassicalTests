@@ -158,3 +158,51 @@ test_that("Raincloud plot is created", {
   plotData <- results[["results"]][["summaryPlots"]][["collection"]][["summaryPlots_rainCloudPlot"]][["collection"]]
   expect_true(length(plotData) > 0)
 })
+
+
+test_that("Summarized input (2 groups): F-test, Bartlett, descriptives and ratio match", {
+  options <- .mvOptions()
+  options$inputType       <- "summarized"
+  options$summarizedGroups <- list(list(groupName = "A", variance = 4.2, n = 30),
+                                   list(groupName = "B", variance = 6.1, n = 28))
+  options$fTest           <- TRUE
+  options$bartlettTest    <- TRUE
+  options$descriptives    <- TRUE
+  options$varianceCi      <- TRUE
+  options$ciMethod        <- "chiSquare"
+  options$varianceRatioCi <- TRUE
+  options$ratioCiMethod   <- "fTest"
+  results <- runAnalysis("multipleVariances", data.frame(dummy = rnorm(3)), options)
+
+  # equivalent to var.test / bartlett.test on samples with the same per-group (n, variance)
+  jaspTools::expect_equal_tables(results[["results"]][["outputTable"]][["data"]], list(
+    29, 27, 0.326156139712839, 0.688524590163935, "F", "",
+    1, "", 0.328367094533456, 0.955326830923282, "Bartlett's", ""
+  ))
+
+  jaspTools::expect_equal_tables(results[["results"]][["descriptivesTable"]][["data"]], list(
+    "A", 2.66390881072003, 30, 2.04939015319192, 7.59016986477236, "", 4.2,
+    "B", 3.81298448150151, 28, 2.46981780704569, 11.3014255538401, "", 6.1
+  ))
+
+  jaspTools::expect_equal_tables(results[["results"]][["varianceRatioTable"]][["data"]], list(
+    0.321436136256667, 0.688524590163935, 1.45972846568377, ""
+  ))
+})
+
+test_that("Summarized input (3 groups): Bartlett only, F-test footnote shown", {
+  options <- .mvOptions()
+  options$inputType       <- "summarized"
+  options$summarizedGroups <- list(list(groupName = "A", variance = 4.2, n = 30),
+                                   list(groupName = "B", variance = 6.1, n = 28),
+                                   list(groupName = "C", variance = 5.0, n = 31))
+  options$fTest        <- TRUE
+  options$bartlettTest <- TRUE
+  results <- runAnalysis("multipleVariances", data.frame(dummy = rnorm(3)), options)
+
+  jaspTools::expect_equal_tables(results[["results"]][["outputTable"]][["data"]], list(
+    2, "", 0.617982254223298, 0.962591073571516, "Bartlett's", ""
+  ))
+  expect_true(any(grepl("only available for 2 groups",
+                        sapply(results[["results"]][["outputTable"]][["footnotes"]], `[[`, "text"))))
+})

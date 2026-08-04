@@ -89,3 +89,26 @@ test_that("Single Variance throws error", {
                    1L,
                    label = "Not enough observations after na.omit")
 })
+
+
+########## summarized data input ##########
+test_that("Single Variance Test summarized input matches VarTest", {
+  options <- analysisOptions("singleVariance")
+  options$inputType      <- "summarized"
+  options$sampleVariance <- 4.2
+  options$sampleSize     <- 30
+  options$testVariance   <- 1
+  options$chiSquareTest  <- TRUE
+  options$varEstimate    <- TRUE
+  options$sdEstimate     <- TRUE
+  options$varianceCi     <- TRUE
+  options$ciMethod       <- "chiSquare"
+  options$alternative    <- "two.sided"
+  results <- runAnalysis("singleVariance", data.frame(dummy = rnorm(3)), options)
+
+  # chi-square, CI and p-value must equal DescTools::VarTest on a sample with the same (n, variance)
+  table <- results[["results"]][["outputTable"]][["data"]]
+  jaspTools::expect_equal_tables(table,
+                                 list(121.8, 2.66390881072003, 7.59016986477236, 29,
+                                      2.53322734049164e-13, 2.04939015319192, 4.2, ""))
+})
