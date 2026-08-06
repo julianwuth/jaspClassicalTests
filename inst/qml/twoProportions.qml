@@ -23,13 +23,13 @@ import JASP
 
 Form
 {
-	info: qsTr("Tests whether the proportion of successes is the same across several groups.\n" + "## " + "Assumptions\n" + "- Independent observations within and between groups.\n- A binary outcome (success/failure) recorded for each group.")
+	info: qsTr("Compares the proportion of successes between two groups, reporting their difference (with confidence interval) and, optionally, the relative risk and odds ratio.\n" + "## " + "Assumptions\n" + "- Independent observations within and between groups.\n- A binary outcome (success/failure) recorded for each group.")
 
 	VariablesForm
 	{
 		preferredHeight:				190 * preferencesModel.uiScale
 		marginBetweenVariablesLists:	15
-		info:							qsTr("**Input**. The data can be supplied either as individual observations (one row per unit, with a binary success variable) or as aggregated counts (one row per group, with the number of successes and the sample size).")
+		info:							qsTr("**Input**. The data can be supplied either as individual observations (one row per unit, with a binary success variable) or as aggregated counts (one row per group, with the number of successes and the sample size). The factor must have exactly two levels.")
 
 		AvailableVariablesList
 		{
@@ -43,7 +43,7 @@ Form
 			title:			qsTr("Factor")
 			singleVariable:	true
 			allowedColumns:	["nominal"]
-			info:			qsTr("The grouping variable that defines the groups whose proportions are compared.")
+			info:			qsTr("The grouping variable that defines the two groups whose proportions are compared.")
 		}
 
 		AssignedVariablesList
@@ -65,15 +65,72 @@ Form
 		}
 	}
 
+	RadioButtonGroup
+	{
+		name:				"alternative"
+		title:				qsTr("Alternative Hypothesis")
+		Layout.columnSpan:	2
+
+		RadioButton
+		{
+			value:		"two.sided"
+			label:		qsTr("Proportions differ")
+			checked:	true
+			info:		qsTr("Two-sided alternative hypothesis that the two population proportions differ.")
+		}
+
+		RadioButton
+		{
+			value:	"greater"
+			label:	qsTr("Group 1 > Group 2")
+			info:	qsTr("One-sided alternative hypothesis that the first group's proportion is greater than the second's.")
+		}
+
+		RadioButton
+		{
+			value:	"less"
+			label:	qsTr("Group 1 < Group 2")
+			info:	qsTr("One-sided alternative hypothesis that the first group's proportion is less than the second's.")
+		}
+	}
+
 	Group
 	{
 		title:	qsTr("Additional Statistics")
 
 		CheckBox
 		{
+			name:				"ci"
+			label:				qsTr("Confidence interval")
+			checked:			true
+			childrenOnSameRow:	true
+			info:				qsTr("Two-sided confidence intervals for the effect sizes.")
+
+			CIField
+			{
+				name:	"ciLevel"
+			}
+		}
+
+		CheckBox
+		{
+			name:	"relativeRisk"
+			label:	qsTr("Relative risk")
+			info:	qsTr("The ratio of the two proportions (p₁ / p₂).")
+		}
+
+		CheckBox
+		{
+			name:	"oddsRatio"
+			label:	qsTr("Odds ratio")
+			info:	qsTr("The ratio of the odds of success in the two groups.")
+		}
+
+		CheckBox
+		{
 			name:	"continuityCorrection"
 			label:	qsTr("Continuity correction")
-			info:	qsTr("Applies Yates' continuity correction to the chi-square statistic.")
+			info:	qsTr("Applies Yates' continuity correction to the chi-square statistic and the difference interval.")
 		}
 
 		CheckBox

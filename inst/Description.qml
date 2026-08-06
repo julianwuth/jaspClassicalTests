@@ -68,11 +68,20 @@ Description
 
 	Analysis
 	{
-		title: qsTr("Multiple Proportions") // Title for window
-		menu: qsTr("Multiple Proportions")  // Title for ribbon
+		title: qsTr("Two Proportions") // Title for window
+		menu: qsTr("Two Proportions")  // Title for ribbon
+		func: "twoProportions"           // Function to be called
+		qml: "twoProportions.qml"               // Design input window
+		requiresData: true
+	}
+
+	Analysis
+	{
+		title: qsTr("> 2 Proportions") // Title for window
+		menu: qsTr("> 2 Proportions")  // Title for ribbon
 		func: "multipleProportions"           // Function to be called
 		qml: "multipleProportions.qml"               // Design input window
-		requiresData: true                
+		requiresData: true
 	}
 
 	Separator{}

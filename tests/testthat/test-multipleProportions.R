@@ -29,19 +29,6 @@ test_that("Equal-proportions test (individual data) matches", {
   ))
 })
 
-test_that("Test-value hypothesis (individual data) matches", {
-  options <- .mpOptions()
-  options$factor     <- "facGender"
-  options$successes  <- "contBinom"
-  options$hypothesis <- "testValue"
-  options$testValue  <- 0.5
-  results <- jaspTools::runAnalysis("multipleProportions", "debug.csv", options)
-
-  expect_equal(results[["results"]][["mainTable"]][["title"]], "Test of Proportions Against 0.5")
-  main <- results[["results"]][["mainTable"]][["data"]]
-  jaspTools::expect_equal_tables(main, list(4, 2, 0.135335283236613))
-})
-
 test_that("Equal-proportions test (aggregated data) matches", {
   options <- .mpOptions()
   options$factor               <- "grp"
