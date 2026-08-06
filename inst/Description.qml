@@ -3,15 +3,15 @@ import JASP.Module
 
 Description
 {
-	name		: "jaspHypothesisTests"
-	title		: qsTr("Hypothesis Tests")
+	name		: "jaspClassicalTests"
+	title		: qsTr("Classical Tests")
 	description	: qsTr("Module that bundles hypothesis tests.")
 	version		: "0.1"
 	author		: "JASP Team"
 	maintainer	: "JASP Team <info@jasp-stats.org>"
 	website		: "https://jasp-stats.org"
 	license		: "GPL (>= 2)"
-	icon        : "ribbon-hypothesis-tests.svg" // Located in /inst/icons/
+	icon        : "ribbon-classical-tests.svg" // Located in /inst/icons/
 	preloadData: true
 	requiresData: true
 
