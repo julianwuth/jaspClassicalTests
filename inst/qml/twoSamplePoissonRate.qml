@@ -192,7 +192,7 @@ Form
                 label:             qsTr("Confidence interval")
                 id:                ratioCi
                 childrenOnSameRow: true
-                info:              qsTr("Confidence interval for the effect (ratio or difference).")
+                info:              qsTr("Confidence interval for the effect (ratio or difference). For the ratio, an exact interval (based on the conditional binomial) or a normal-approximation interval on the log scale is available. For the difference, the exact test reports a MOVER interval that combines the exact single-rate Poisson intervals (Zou & Donner, 2008), while the normal approximation reports an unpooled Wald interval.")
 
                 CIField { name: "confLevel" }
                 
@@ -203,7 +203,6 @@ Form
                 name:                  "ciMethod"
                 title:                 qsTr("Method")
                 enabled:               ratioCi.checked
-                visible:               targetRatio.checked
                 radioButtonsOnSameRow: true
                 indent:                true
 

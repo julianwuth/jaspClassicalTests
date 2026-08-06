@@ -254,8 +254,12 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
         "less"      = gettextf("H\u2081: Rate\u2081 \u2212 Rate\u2082 < %.4g.", d0)
       )
     )
-    if (options[["ratioCi"]])
-      outputTable$addFootnote(gettext("Confidence interval based on the unpooled standard error."))
+    if (options[["ratioCi"]]) {
+      if (options[["ciMethod"]] == "exact")
+        outputTable$addFootnote(gettext("Confidence interval for the difference based on the MOVER method combining exact single-rate Poisson intervals (Zou & Donner, 2008)."))
+      else
+        outputTable$addFootnote(gettext("Confidence interval for the difference based on the unpooled standard-error normal approximation."))
+    }
   } else {
     r0 <- options[["testRatio"]]
     outputTable$addFootnote(
@@ -381,10 +385,8 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
     stringsAsFactors = FALSE
   )
 
-  if (options[["ratioCi"]]) {
-    row$ciLower <- NA
-    row$ciUpper <- NA
-  }
+  if (options[["ratioCi"]])
+    row <- .addDiffCiTR(row, g1, g2, options)
 
   return(row)
 }
@@ -430,12 +432,23 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   )
 
   if (options[["ratioCi"]])
-    row <- .addDiffCiTR(row, g1, g2, seUnpooled, options)
+    row <- .addDiffCiTR(row, g1, g2, options)
 
   return(row)
 }
 
-.addDiffCiTR <- function(row, g1, g2, seUnpooled, options) {
+# Dispatch the difference CI on the selected method:
+#   exact  -> MOVER interval from exact single-rate Poisson intervals
+#   normal -> unpooled Wald interval
+.addDiffCiTR <- function(row, g1, g2, options) {
+  if (options[["ciMethod"]] == "exact")
+    return(.moverDiffCiTR(row, g1, g2, options))
+  return(.waldDiffCiTR(row, g1, g2, options))
+}
+
+.waldDiffCiTR <- function(row, g1, g2, options) {
+  seUnpooled <- sqrt(g1$rate / g1$time + g2$rate / g2$time)
+
   if (!is.finite(seUnpooled)) {
     row$ciLower <- NA
     row$ciUpper <- NA
@@ -455,6 +468,57 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   } else {
     row$ciLower <- -Inf
     row$ciUpper <- diff + z * seUnpooled
+  }
+  return(row)
+}
+
+# MOVER (Method of Variance Estimates Recovery) CI for the rate difference.
+# Combines the exact single-rate Poisson intervals (l_i, u_i) into an interval
+# for Rate1 - Rate2. Zou, G. Y., & Donner, A. (2008). Construction of confidence
+# limits about effect measures: A general approach. Statistics in Medicine,
+# 27(10), 1693-1702. Formulas:
+#   Lower = d - sqrt((r1 - l1)^2 + (u2 - r2)^2)
+#   Upper = d + sqrt((u1 - r1)^2 + (r2 - l2)^2)
+# One-sided alternatives use one-sided single-rate limits at the same level.
+.moverDiffCiTR <- function(row, g1, g2, options) {
+  r1  <- g1$rate
+  r2  <- g2$rate
+  d   <- r1 - r2
+  cl  <- options[["confLevel"]]
+  alt <- options[["alternative"]]
+
+  # exact one-sided Poisson limits for a single rate (events / time)
+  lowerLimit <- function(events, time)
+    stats::poisson.test(events, time, conf.level = cl, alternative = "greater")$conf.int[1]
+  upperLimit <- function(events, time)
+    stats::poisson.test(events, time, conf.level = cl, alternative = "less")$conf.int[2]
+
+  limits <- try(
+    if (alt == "two.sided") {
+      ci1 <- stats::poisson.test(g1$events, g1$time, conf.level = cl)$conf.int
+      ci2 <- stats::poisson.test(g2$events, g2$time, conf.level = cl)$conf.int
+      l1  <- ci1[1]; u1 <- ci1[2]
+      l2  <- ci2[1]; u2 <- ci2[2]
+      c(d - sqrt((r1 - l1)^2 + (u2 - r2)^2),
+        d + sqrt((u1 - r1)^2 + (r2 - l2)^2))
+    } else if (alt == "greater") {
+      l1 <- lowerLimit(g1$events, g1$time)
+      u2 <- upperLimit(g2$events, g2$time)
+      c(d - sqrt((r1 - l1)^2 + (u2 - r2)^2), Inf)
+    } else {
+      u1 <- upperLimit(g1$events, g1$time)
+      l2 <- lowerLimit(g2$events, g2$time)
+      c(-Inf, d + sqrt((u1 - r1)^2 + (r2 - l2)^2))
+    },
+    silent = TRUE
+  )
+
+  if (isTryError(limits)) {
+    row$ciLower <- NA
+    row$ciUpper <- NA
+  } else {
+    row$ciLower <- limits[1]
+    row$ciUpper <- limits[2]
   }
   return(row)
 }
