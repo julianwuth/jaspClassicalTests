@@ -11,13 +11,14 @@ Description
 	maintainer	: "JASP Team <info@jasp-stats.org>"
 	website		: "https://jasp-stats.org"
 	license		: "GPL (>= 2)"
-	icon        : "exampleIcon.png" // Located in /inst/icons/
+	icon        : "ribbon-hypothesis-tests.svg" // Located in /inst/icons/
 	preloadData: true
 	requiresData: true
 
 	GroupTitle
 	{
 		title: qsTr("Means")
+        icon: "param-mu-grey.svg"
 	}
 
 	Analysis
@@ -53,6 +54,7 @@ Description
 	GroupTitle
 	{
 		title: qsTr("Proportions")
+        icon: "param-pi-grey.svg"
 	}
 
 	Analysis
@@ -78,6 +80,7 @@ Description
 	GroupTitle
 	{
 		title: qsTr("Rates")
+        icon: "param-lambda-grey.svg"
 	}
 
 	Analysis
@@ -103,6 +106,7 @@ Description
 	GroupTitle
 	{
 		title: qsTr("Variances")
+        icon: "param-sigma2-grey.svg"
 	}
 
 	Analysis
@@ -111,7 +115,7 @@ Description
 		menu: qsTr("One Variance")  // Title for ribbon
 		func: "singleVariance"           // Function to be called
 		qml: "singleVariance.qml"               // Design input window
-		requiresData: true                
+		requiresData: false                
 	}
 
 	Analysis
@@ -120,7 +124,7 @@ Description
 		menu: qsTr("Multiple Variances")  // Title for ribbon
 		func: "multipleVariances"           // Function to be called
 		qml: "multipleVariances.qml"               // Design input window
-		requiresData: true
+		requiresData: false
 	}
 
 	Separator{}
@@ -128,6 +132,7 @@ Description
 	GroupTitle
 	{
 		title: qsTr("Correlations")
+        icon: "param-rho-grey.svg"
 	}
 
 	Analysis
