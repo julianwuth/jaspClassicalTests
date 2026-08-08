@@ -172,7 +172,7 @@ test_that("Summarized input (2 groups): F-test, Bartlett, descriptives and ratio
   options$ciMethod        <- "chiSquare"
   options$varianceRatioCi <- TRUE
   options$ratioCiMethod   <- "fTest"
-  results <- runAnalysis("multipleVariances", data.frame(dummy = rnorm(3)), options)
+  results <- jaspTools::runAnalysis("multipleVariances", data.frame(dummy = rnorm(3)), options)
 
   # equivalent to var.test / bartlett.test on samples with the same per-group (n, variance)
   jaspTools::expect_equal_tables(results[["results"]][["outputTable"]][["data"]], list(
@@ -198,7 +198,7 @@ test_that("Summarized input (3 groups): Bartlett only, F-test footnote shown", {
                                    list(groupName = "C", variance = 5.0, n = 31))
   options$fTest        <- TRUE
   options$bartlettTest <- TRUE
-  results <- runAnalysis("multipleVariances", data.frame(dummy = rnorm(3)), options)
+  results <- jaspTools::runAnalysis("multipleVariances", data.frame(dummy = rnorm(3)), options)
 
   jaspTools::expect_equal_tables(results[["results"]][["outputTable"]][["data"]], list(
     2, "", 0.617982254223298, 0.962591073571516, "Bartlett's", ""

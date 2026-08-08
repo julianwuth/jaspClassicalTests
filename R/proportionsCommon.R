@@ -98,7 +98,8 @@
   descTable <- createJaspTable(title = gettext("Descriptives"))
   descTable$dependOn(c("factor", "successes", "sampleSize", "descriptivesTable",
                        "descriptivesDisplay", "descriptivesTableCi", "descriptivesTableCiLevel"))
-  descTable$position <- 2
+  # 3 (not 2) so it sits after the two-proportions effect-size table (position 2).
+  descTable$position <- 3
   descTable$showSpecifiedColumnsOnly <- TRUE
 
   factorTitle <- if (options[["factor"]] == "") gettext("Factor") else options[["factor"]]
@@ -175,7 +176,7 @@
   descPlot <- createJaspPlot(title = gettext("Descriptives Plot"), width = 480, height = 320)
   descPlot$dependOn(c("factor", "successes", "sampleSize", "descriptivesPlot",
                       "descriptivesDisplay", "descriptivesPlotCiLevel"))
-  descPlot$position <- 3
+  descPlot$position <- 4
   jaspResults[["descriptivesPlot"]] <- descPlot
 
   if (!ready)

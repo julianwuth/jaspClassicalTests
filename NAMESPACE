@@ -16,21 +16,26 @@ export(twoSamplePoissonRate)
 import(jaspBase)
 import(jaspFrequencies)
 import(jaspTTests)
-importFrom(car,leveneTest)
-importFrom(stats,ave)
-importFrom(stats,bartlett.test)
-importFrom(stats,complete.cases)
-importFrom(stats,cor)
-importFrom(stats,cor.test)
-importFrom(stats,na.omit)
-importFrom(stats,pchisq)
-importFrom(stats,pf)
-importFrom(stats,pnorm)
-importFrom(stats,poisson.test)
-importFrom(stats,qchisq)
-importFrom(stats,qnorm)
-importFrom(stats,sd)
-importFrom(stats,shapiro.test)
-importFrom(stats,uniroot)
-importFrom(stats,var)
-importFrom(stats,var.test)
+importFrom(stats,
+  anova,
+  ave,
+  bartlett.test,
+  complete.cases,
+  cor,
+  cor.test,
+  lm,
+  median,
+  na.omit,
+  pchisq,
+  pf,
+  pnorm,
+  poisson.test,
+  prop.test,
+  qchisq,
+  qnorm,
+  sd,
+  shapiro.test,
+  uniroot,
+  var,
+  var.test
+)

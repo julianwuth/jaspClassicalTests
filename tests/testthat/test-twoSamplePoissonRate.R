@@ -58,6 +58,30 @@ test_that("Summarized data: ratio target matches", {
   ))
 })
 
+test_that("Summarized data: normal-approx ratio uses the Wald log rate-ratio CI", {
+  options <- .tsprOptions()
+  options$inputType           <- "summarized"
+  options$groupOneOccurrences <- 15
+  options$groupOneSampleSize  <- 10
+  options$groupTwoOccurrences <- 8
+  options$groupTwoSampleSize   <- 10
+  options$testTarget          <- "ratio"
+  options$testRatio           <- 1
+  options$exactTest           <- FALSE
+  options$normalApprox        <- TRUE
+  options$ratioCi             <- TRUE
+  options$ciMethod            <- "normal"
+  options$descriptives        <- FALSE
+  results <- jaspTools::runAnalysis("twoSamplePoissonRate", "debug.csv", options)
+
+  # Wald CI for log(rate1/rate2): (1.5/0.8) * exp(+/- z * sqrt(1/15 + 1/8));
+  # verified against a Poisson-GLM Wald interval.
+  main <- results[["results"]][["outputTable"]][["data"]]
+  jaspTools::expect_equal_tables(main, list(
+    0.7949638, 4.422371, 1.875, "Normal approximation", 0.1443998, 1.5, 0.8, 1.459601
+  ))
+})
+
 test_that("Raw data: ratio without interval column aggregates counts per group", {
   rawTwo <- data.frame(
     cnt = c(2, 3, 1, 4, 0, 2, 1, 1, 0, 1),

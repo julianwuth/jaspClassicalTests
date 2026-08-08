@@ -67,6 +67,32 @@ test_that("Two proportions (aggregated data) matches", {
   ))
 })
 
+test_that("Zero success count yields NA relative-risk/odds-ratio CI with warnings", {
+  aggData <- data.frame(grp = factor(c("A", "B")), succ = c(8, 0), n = c(20, 20))
+  options <- .tpOptions()
+  options$factor       <- "grp"
+  options$successes    <- "succ"
+  options$sampleSize   <- "n"
+  options$relativeRisk <- TRUE
+  options$oddsRatio    <- TRUE
+  options$ci           <- TRUE
+  results <- jaspTools::runAnalysis("twoProportions", aggData, options)
+
+  expect_equal(results[["status"]], "complete")
+  es <- results[["results"]][["effectSizeTable"]][["data"]]
+
+  # Difference CI still computed; RR and OR CI bounds are empty (NA).
+  expect_true(es[[1]][["lower"]] != "" && es[[1]][["upper"]] != "")   # Difference
+  expect_identical(es[[2]][["lower"]], "")                            # Relative risk
+  expect_identical(es[[2]][["upper"]], "")
+  expect_identical(es[[3]][["lower"]], "")                            # Odds ratio
+  expect_identical(es[[3]][["upper"]], "")
+
+  notes <- vapply(results[["results"]][["effectSizeTable"]][["footnotes"]], `[[`, character(1), "text")
+  expect_true(any(grepl("relative-risk confidence interval is undefined", notes)))
+  expect_true(any(grepl("odds-ratio confidence interval is undefined", notes)))
+})
+
 test_that("Factor with more than two levels aborts", {
   aggData <- data.frame(grp = factor(c("A", "B", "C")), succ = c(20, 30, 40), n = c(50, 50, 50))
   options <- .tpOptions()

@@ -119,6 +119,8 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
   }
 
   esTable$setData(rows)
+  for (note in attr(rows, "footnotes"))
+    esTable$addFootnote(note, symbol = gettext("<b>Warning:</b>"))
   .tpAddGroupFootnote(esTable, data)
 
   return()
@@ -150,22 +152,38 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
   rows <- .tpRow(gettext("Difference (p₁ − p₂)"), p1 - p2,
                  if (withCI) diffTest$conf.int[1] else NA_real_,
                  if (withCI) diffTest$conf.int[2] else NA_real_, withCI)
+  footnotes <- character(0)
 
   if (options[["relativeRisk"]]) {
     rr    <- p1 / p2
-    seLog <- sqrt((1 - p1) / x1 + (1 - p2) / x2)
-    rows  <- rbind(rows, .tpRow(gettext("Relative risk"), rr,
-                                exp(log(rr) - z * seLog), exp(log(rr) + z * seLog), withCI))
+    # log-SE, and hence the CI, is undefined when either success count is 0.
+    valid <- x1 > 0 && x2 > 0
+    ci    <- .tpRatioCi(log(rr), sqrt((1 - p1) / x1 + (1 - p2) / x2), z, withCI && valid)
+    if (withCI && !valid)
+      footnotes <- c(footnotes, gettext("The relative-risk confidence interval is undefined when a success count is zero."))
+    rows <- rbind(rows, .tpRow(gettext("Relative risk"), rr, ci[1], ci[2], withCI))
   }
 
   if (options[["oddsRatio"]]) {
     or    <- (x1 * (n2 - x2)) / (x2 * (n1 - x1))
-    seLog <- sqrt(1 / x1 + 1 / (n1 - x1) + 1 / x2 + 1 / (n2 - x2))
-    rows  <- rbind(rows, .tpRow(gettext("Odds ratio"), or,
-                                exp(log(or) - z * seLog), exp(log(or) + z * seLog), withCI))
+    # log-SE, and hence the CI, is undefined when any of the four cells is 0.
+    valid <- x1 > 0 && x2 > 0 && (n1 - x1) > 0 && (n2 - x2) > 0
+    ci    <- .tpRatioCi(log(or), sqrt(1 / x1 + 1 / (n1 - x1) + 1 / x2 + 1 / (n2 - x2)), z, withCI && valid)
+    if (withCI && !valid)
+      footnotes <- c(footnotes, gettext("The odds-ratio confidence interval is undefined when a cell count is zero."))
+    rows <- rbind(rows, .tpRow(gettext("Odds ratio"), or, ci[1], ci[2], withCI))
   }
 
+  attr(rows, "footnotes") <- footnotes
   return(rows)
+}
+
+# Log-scale Wald CI for a ratio effect size, back-transformed to the ratio
+# scale. Returns NA bounds when the interval is not defined (degenerate cell).
+.tpRatioCi <- function(logEstimate, seLog, z, valid) {
+  if (!valid || !is.finite(seLog))
+    return(c(NA_real_, NA_real_))
+  c(exp(logEstimate - z * seLog), exp(logEstimate + z * seLog))
 }
 
 .tpRow <- function(measure, estimate, lower, upper, withCI) {

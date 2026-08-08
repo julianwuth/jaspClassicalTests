@@ -40,3 +40,18 @@ test_that("One Correlation throws error on infinity", {
   results <- runAnalysis("oneCorrelation", dat, options)
   expect_identical(results[["status"]], "validationError")
 })
+
+########## Fisher-z CI matches jaspRegression exactly ##########
+test_that("Fisher-z CI is identical to jaspRegression's implementation", {
+  skip_if_not_installed("jaspRegression")
+  grid <- expand.grid(r = c(-0.9, -0.3, 0, 0.25, 0.6, 0.95),
+                      n = c(5, 12, 40, 200),
+                      hyp = c("two.sided", "less", "greater"),
+                      cl = c(0.90, 0.95, 0.99),
+                      stringsAsFactors = FALSE)
+  for (i in seq_len(nrow(grid))) {
+    mine <- jaspClassicalTests:::.corrFisherCi(grid$r[i], grid$n[i], grid$hyp[i], grid$cl[i])
+    ref  <- jaspRegression:::.corrNormalApproxConfidenceIntervals(grid$r[i], grid$n[i], grid$hyp[i], grid$cl[i])
+    expect_equal(mine, ref)
+  }
+})

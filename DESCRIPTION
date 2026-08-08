@@ -2,8 +2,9 @@ Package: jaspClassicalTests
 Type: Package
 Title: A JASP module for classical tests.
 Version: 0.1.0
-Date: 2020-10-15
-Author: JASP Team
+Date: 2026-08-08
+Authors@R:
+    person("JASP Team", role = c("aut", "cre"), email = "info@jasp-stats.org")
 Website: jasp-stats.org
 Maintainer: JASP Team <info@jasp-stats.org>
 Description: Module that bundles classical statistical tests.
@@ -16,11 +17,12 @@ Imports:
     jaspGraphs,
     jaspTTests
 Suggests:
-  testthat,
-  jaspRegression
-Remotes:
+    jaspRegression (>= 0.96.5),
+    testthat
+Remotes: 
     jasp-stats/jaspBase,
     jasp-stats/jaspGraphs,
     jasp-stats/jaspTTests,
-    jasp-stats/jaspFrequencies
-Config/roxygen2/version: 8.0.0
+    jasp-stats/jaspFrequencies,
+    jasp-stats/jaspRegression
+Config/roxygen2/version: 8.1.0

@@ -58,7 +58,9 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
     for (i in 1:2) {
       mask   <- !is.na(groupCol) & groupCol == lvls[i]
       counts <- stats::na.omit(countCol[mask])
-      events <- as.integer(round(sum(counts))) # TODO does this have to be rounded?
+      # poisson.test requires an integer event count; round the summed raw counts
+      # (consistent with the one-sample rate analysis).
+      events <- as.integer(round(sum(counts)))
 
       if (options[["time"]] != "") {
         timeCol <- dataset[[options[["time"]]]]
@@ -102,7 +104,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
 
   descTable$addColumnInfo(name = "groupName", title = gettext("Group"),       type = "string")
   descTable$addColumnInfo(name = "events",    title = gettext("Occurrences"), type = "integer")
-  descTable$addColumnInfo(name = "time",      title = gettext("N"),           type = "number")
+  descTable$addColumnInfo(name = "time",      title = gettext("Interval"),    type = "number")
   descTable$addColumnInfo(name = "rate",      title = gettext("Rate"),        type = "number")
 
   if (options[["descriptiveCi"]]) {
@@ -120,7 +122,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
 
   groupData <- try(.getGroupDataTR(dataset, options), silent = TRUE)
   if (isTryError(groupData)) {
-    descTable$setError(gettext(as.character(groupData)))
+    descTable$setError(.extractErrorMessage(groupData))
     return()
   }
 
@@ -206,7 +208,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
 .fillMainTableTR <- function(outputTable, dataset, options) {
   groupData <- try(.getGroupDataTR(dataset, options), silent = TRUE)
   if (isTryError(groupData)) {
-    outputTable$setError(gettext(as.character(groupData)))
+    outputTable$setError(.extractErrorMessage(groupData))
     return()
   }
 
@@ -269,6 +271,12 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
         "less"      = gettextf("H\u2081: Rate\u2081/Rate\u2082 < %.4g.", r0)
       )
     )
+    if (options[["ratioCi"]]) {
+      if (options[["ciMethod"]] == "exact")
+        outputTable$addFootnote(gettext("Confidence interval for the ratio based on the exact conditional Poisson method (matching the exact test)."))
+      else
+        outputTable$addFootnote(gettext("Confidence interval for the ratio based on the Wald approximation for the log rate-ratio; the accompanying normal-approximation test uses a conditional binomial score statistic."))
+    }
   }
 
   outputTable$addFootnote(
@@ -289,7 +297,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   )
 
   if (isTryError(out)) {
-    outputTable$setError(gettext(as.character(out)))
+    outputTable$setError(.extractErrorMessage(out))
     return(NULL)
   }
 
@@ -318,7 +326,8 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   r0 <- options[["testRatio"]]
 
   # Conditional binomial score test: X1 | X1+X2 ~ Bin(n, p0)
-  n  <- x1 + x2 # TODO this overflows for huge values
+  # Add as doubles so the total cannot overflow R's 32-bit integer type.
+  n  <- as.numeric(x1) + as.numeric(x2)
   p0 <- r0 * T1 / (r0 * T1 + T2)
 
   if (n == 0) {
@@ -370,7 +379,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   )
 
   if (isTryError(out)) {
-    outputTable$setError(gettext(as.character(out)))
+    outputTable$setError(.extractErrorMessage(out))
     return(NULL)
   }
 
@@ -541,8 +550,12 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
       row$ciLower <- ciOut$conf.int[1]
       row$ciUpper <- ciOut$conf.int[2]
     }
-  } else { # log-transform normal CI for ratio
-    # TODO check if this is correct
+  } else { # Wald CI for the log rate-ratio
+    # Standard Wald interval for a Poisson rate ratio: Var(log(rate1/rate2)) = 1/x1 + 1/x2
+    # (delta method), so CI = (rate1/rate2) * exp(+/- z * sqrt(1/x1 + 1/x2)). Verified to
+    # match a Poisson-GLM Wald interval (Rothman, Greenland & Lash, 2008). Undefined if a
+    # count is 0. Note the accompanying normal-approx test is a conditional binomial score
+    # test, so the ratio test statistic and this CI use different approximations.
     x1 <- g1$events
     x2 <- g2$events
     if (x1 == 0 || x2 == 0) {

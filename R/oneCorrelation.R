@@ -136,7 +136,10 @@ oneCorrelation <- function(jaspResults, dataset, options, ...) {
   if (isTryError(corTest)) {
     outputTable$addFootnote(gettextf("%1$s could not be computed: %2$s", label, .oneCorrelationCleanError(corTest)),
                             symbol = gettext("<b>Warning:</b>"))
-    return(data.frame(test = label, n = n, r = NA, p = NA))
+    # NA-filled row with the same columns as a successful row, so rbind() does
+    # not fail when one method errors while another succeeds.
+    return(.oneCorrelationRow(label, n, r = NA, p = NA, ci = c(NA, NA),
+                              effectSize = NA, seEffectSize = NA, vsmpr = NA, options))
   }
 
   r <- unname(corTest$estimate)
@@ -152,34 +155,41 @@ oneCorrelation <- function(jaspResults, dataset, options, ...) {
                 "less"      = pnorm(z))
   }
 
+  # CI only defined for Pearson's r; other methods report NA bounds.
+  ci <- if (method == "pearson") .corrFisherCi(r, n, alt, options[["ciLevel"]]) else c(NA, NA)
+
+  .oneCorrelationRow(label, n, r, p, ci,
+                     effectSize   = atanh(r),
+                     seEffectSize = .oneCorrelationEffectSizeSE(r, n, method),
+                     vsmpr        = .oneCorrelationVsmpr(p), options)
+}
+
+# Assemble a table row, adding the optional CI / effect-size / VS-MPR columns
+# only when requested. Used by both the success and error paths so every row
+# carries identical columns.
+.oneCorrelationRow <- function(label, n, r, p, ci, effectSize, seEffectSize, vsmpr, options) {
   row <- data.frame(test = label, n = n, r = r, p = p)
 
   if (options[["ci"]]) {
-    if (method == "pearson") {
-      ci <- .corrFisherCi(r, n, alt, options[["ciLevel"]])
-      row$lowerCi <- ci[1]
-      row$upperCi <- ci[2]
-    } else {
-      row$lowerCi <- NA
-      row$upperCi <- NA
-    }
+    row$lowerCi <- ci[1]
+    row$upperCi <- ci[2]
   }
 
   if (options[["effectSize"]]) {
-    row$effectSize   <- atanh(r)
-    row$seEffectSize <- .oneCorrelationEffectSizeSE(r, n, method)
+    row$effectSize   <- effectSize
+    row$seEffectSize <- seEffectSize
   }
 
   if (options[["vovkSellke"]])
-    row$vsmpr <- .oneCorrelationVsmpr(p)
+    row$vsmpr <- vsmpr
 
   return(row)
 }
 
 # Fisher's z normal-approximation confidence interval for a Pearson correlation.
 # Ported from jaspRegression's .corrNormalApproxConfidenceIntervals so the module
-# does not need jaspRegression as a hard dependency.
-# TODO: Test this against jaspRegression's implementation to make sure they are equivalent.
+# does not need jaspRegression as a hard dependency. Verified numerically
+# identical to that implementation (see test-oneCorrelation.R).
 .corrFisherCi <- function(obsCor, n, hypothesis = "two.sided", confLevel = 0.95) {
   zCor  <- atanh(obsCor)
   se    <- 1 / sqrt(n - 3)
@@ -217,7 +227,7 @@ oneCorrelation <- function(jaspResults, dataset, options, ...) {
 }
 
 .oneCorrelationVsmpr <- function(p) {
-  vsmpr <- jaspBase:::VovkSellkeMPR(p)
+  vsmpr <- VovkSellkeMPR(p)
   if (identical(vsmpr, "∞"))
     return(Inf)
   return(as.numeric(vsmpr))

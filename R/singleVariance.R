@@ -62,19 +62,20 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 
   outputTable$addColumnInfo(name = "varName",   title = gettext("Variable"),          type = "string")
 
-  if (options$varEstimate)
+  if (options[["varEstimate"]])
     outputTable$addColumnInfo(name = "varEst", title = gettext("Variance"), type = "number")
 
-  if (options$sdEstimate)
+  if (options[["sdEstimate"]])
     outputTable$addColumnInfo(name = "sdEst", title = gettext("Std"), type = "number")
 
-  outputTable$addColumnInfo(name = "chiSquare", title = gettext("&#967<sup>2</sup>"), type = "number")
-  outputTable$addColumnInfo(name = "df",        title = gettext("df"),                type = "integer")
-  outputTable$addColumnInfo(name = "pValue",    title = gettext("p"),                 type = "pvalue")
+  outputTable$addColumnInfo(name = "chiSquare", title = "χ²", type = "number")
+  outputTable$addColumnInfo(name = "df",        title = gettext("df"),  type = "integer")
+  outputTable$addColumnInfo(name = "pValue",    title = gettext("p"),   type = "pvalue")
 
-  if (options$varianceCi) {
-    outputTable$addColumnInfo(name = "ciLower", title = gettext("Lower"), type = "number", overtitle = gettextf("%i%% Confidence Interval<br>Variance", options$confLevel * 100))
-    outputTable$addColumnInfo(name = "ciUpper", title = gettext("Upper"), type = "number", overtitle = gettextf("%i%% Confidence Interval<br>Variance", options$confLevel * 100))
+  if (options[["varianceCi"]]) {
+    ciOvertitle <- gettextf("%i%% Confidence Interval<br>Variance", options[["confLevel"]] * 100)
+    outputTable$addColumnInfo(name = "ciLower", title = gettext("Lower"), type = "number", overtitle = ciOvertitle)
+    outputTable$addColumnInfo(name = "ciUpper", title = gettext("Upper"), type = "number", overtitle = ciOvertitle)
   }
 
   outputTable$showSpecifiedColumnsOnly <- TRUE
@@ -105,21 +106,14 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 
   # add footnote describing the hypothesis
   outputTable$addFootnote(
-    switch(options$alternative,
-           "two.sided" = gettextf("Variances tested against value: %.2f.", round(options$testVariance, 2)), # explicit rounding because gettextf would round 2.255 to 2.25
-           "greater" = gettextf("For all tests, the alternative hypothesis is that the variance is greater than %.2f.", round(options$testVariance, 2)),
-           "less" = gettextf("For all tests, the alternative hypothesis is that the variance is less than %.2f.", round(options$testVariance, 2))
+    switch(options[["alternative"]],
+           "two.sided" = gettextf("Variances tested against value: %.2f.", round(options[["testVariance"]], 2)), # explicit rounding because gettextf would round 2.255 to 2.25
+           "greater" = gettextf("For all tests, the alternative hypothesis is that the variance is greater than %.2f.", round(options[["testVariance"]], 2)),
+           "less" = gettextf("For all tests, the alternative hypothesis is that the variance is less than %.2f.", round(options[["testVariance"]], 2))
     )
   )
 
   return()
-}
-
-# Build a sample with exactly the requested size and variance so the summarized
-# input runs through the same VarTest/VarCI code path as raw data.
-.syntheticSampleSV <- function(n, variance) {
-  z <- seq_len(n) - (n + 1) / 2 # centered sequence
-  z / sd(z) * sqrt(variance)
 }
 
 .computeSVTest <- function(entry, options, outputTable, dataset) {
@@ -136,11 +130,11 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 
   # Note that the p-value is not the same as 2 * pchisq(test_val, df, lower.tail = FALSE)
   # for the two-sided test
-  out <- try(DescTools::VarTest(col, alternative = options$alternative,
-                                sigma.squared = options$testVariance,
-                                conf.level = options$confLevel), silent = TRUE)
+  out <- try(DescTools::VarTest(col, alternative = options[["alternative"]],
+                                sigma.squared = options[["testVariance"]],
+                                conf.level = options[["confLevel"]]), silent = TRUE)
   if (isTryError(out)) {
-    outputTable$setError(gettext(as.character(out)))
+    outputTable$setError(.extractErrorMessage(out))
     return(NULL)
   }
 
@@ -157,10 +151,10 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
     ciLower <- out$conf.int[1]
     ciUpper <- out$conf.int[2]
   } else { # Bonett method
-    ciRes <- try(DescTools::VarCI(col, method = "bonett", conf.level = options$confLevel,
+    ciRes <- try(DescTools::VarCI(col, method = "bonett", conf.level = options[["confLevel"]],
                                   sides = .getSidesCi(options)), silent = TRUE)
     if (isTryError(ciRes)) {
-      outputTable$setError(gettext(as.character(ciRes)))
+      outputTable$setError(.extractErrorMessage(ciRes))
       return(NULL)
     }
 
@@ -174,7 +168,7 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 }
 
 .getSidesCi <- function(options) {
-  sides <- switch(options$alternative,
+  sides <- switch(options[["alternative"]],
                   "greater" = "left",
                   "less" = "right",
                   "two.sided")
@@ -191,10 +185,10 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 
    jaspResults[["assumptionChecks"]] <- assumptionContainer
 
-  if (options$normalityTest)
+  if (options[["normalityTest"]])
    .createNormalityTestTable(jaspResults, dataset, options, ready)
 
-  if (options$qqPlot)
+  if (options[["qqPlot"]])
     .createQQPlot(jaspResults, dataset, ready)
 
   return()
@@ -213,14 +207,16 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
   qqContainer$dependOn(c("qqPlot", "dependent"))
   jaspResults[["assumptionChecks"]][["qqPlots"]] <- qqContainer
 
-  for (i in 1:ncol(dataset)) {
-    tempDat <- dataset[, i]
-    tempPlot <- createJaspPlot(title = gettext(colnames(dataset)[i]), height = 400, width = 500)
+  for (i in seq_len(ncol(dataset))) {
+    colName  <- colnames(dataset)[i]
+    tempDat  <- dataset[, i]
+    tempPlot <- createJaspPlot(title = jaspBase::decodeColNames(colName), height = 400, width = 500)
+    # Standardized-residual Q-Q plot, matching jaspTTests (plotQQnorm(scale(resid), ...)).
     tempPlot$plotObject <- jaspGraphs::plotQQnorm(as.vector(scale(tempDat)), # as.vector extracts the standardized values
                                                   ciLevel = 0.95,
-                                                  yName = "Standardized Residuals",
-                                                  xName = "Theoretical Quantiles") # TODO this does not match the results from other modules
-    qqContainer[[colnames(dataset)[i]]] <- tempPlot
+                                                  yName = gettext("Standardized Residuals"),
+                                                  xName = gettext("Theoretical Quantiles"))
+    qqContainer[[colName]] <- tempPlot
   }
 
   return()
@@ -251,11 +247,13 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
   resList <- lapply(colnames(dataset), function(name) {
 
     x <- na.omit(dataset[[name]])
-    residuals <- x - mean(x) # TODO should this also be scaled?
+    # Shapiro-Wilk is invariant to location and scale, so centering (or scaling)
+    # leaves W and the p-value unchanged; the deviations are shown as "Residuals".
+    residuals <- x - mean(x)
     swTest <- try(shapiro.test(residuals), silent = TRUE)
 
     if (isTryError(swTest)) {
-      normalityTable$setError(gettext(as.character(swTest)))
+      normalityTable$setError(.extractErrorMessage(swTest))
       return(NULL)
     }
 

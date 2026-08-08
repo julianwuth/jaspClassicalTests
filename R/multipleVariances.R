@@ -16,8 +16,7 @@
 #
 
 #' @import jaspBase
-#' @importFrom stats bartlett.test var.test shapiro.test na.omit pchisq pf pnorm qchisq sd uniroot var ave
-#' @importFrom car leveneTest
+#' @importFrom stats bartlett.test var.test shapiro.test na.omit pchisq pf pnorm qchisq sd uniroot var ave lm anova median
 #' @export
 multipleVariances <- function(jaspResults, dataset, options, ...) {
   isRaw <- options[["inputType"]] == "rawData"
@@ -26,7 +25,9 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   if (isRaw) {
     ready <- (length(options[["dependent"]]) > 0 && options[["factor"]] != "")
     if (ready)
-      # TODO check if this should also check for exactly 2 levels of the factor
+      # At least 2 levels are required. Exactly 2 is NOT required: Bartlett's, Levene's
+      # and Bonett's tests support k > 2 groups; the F-test and variance ratio (2-group
+      # only) fall back to a footnote when there are more than 2 levels.
       .hasErrors(dataset, type = c('infinity', 'variance', 'factorLevels'),
                  infinity.target = options[["dependent"]],
                  variance.target = options[["dependent"]],
@@ -151,7 +152,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     if (options[["fTest"]] && nLevels == 2) {
       res <- try(var.test(y ~ group), silent = TRUE)
       if (isTryError(res)) {
-        outputTable$setError(gettext(as.character(res)))
+        outputTable$setError(.extractErrorMessage(res))
         return()
       }
       rows[[length(rows) + 1]] <- list(var = depName, test = gettext("F"),
@@ -161,23 +162,23 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
       fTestFootnoteAdded <- TRUE
     }
 
-    # Levene's Test (requires raw data)
+    # Levene's Test (requires raw data). Centered on the group median, i.e. the
+    # Brown-Forsythe variant, but displayed as "Levene's" for continuity.
     if (isRaw && options[["leveneTest"]]) {
-      # TODO using the median technically means that this is the Brown-Forsythe test
-      res <- try(car::leveneTest(y ~ group, center = median), silent = TRUE)
+      res <- try(.leveneTestMV(y, group), silent = TRUE)
       if (isTryError(res)) {
-        outputTable$setError(gettext(as.character(res)))
+        outputTable$setError(.extractErrorMessage(res))
         return()
       }
       rows[[length(rows) + 1]] <- list(var = depName, test = gettext("Levene's"),
-                                       stat = res$`F value`[1], df1 = res$Df[1], df2 = res$Df[2], p = res$`Pr(>F)`[1])
+                                       stat = res$statistic, df1 = res$df1, df2 = res$df2, p = res$p.value)
     }
 
     # Bartlett's Test
     if (options[["bartlettTest"]]) {
       res <- try(bartlett.test(y ~ group), silent = TRUE)
       if (isTryError(res)) {
-        outputTable$setError(gettext(as.character(res)))
+        outputTable$setError(.extractErrorMessage(res))
         return()
       }
       rows[[length(rows) + 1]] <- list(var = depName, test = gettext("Bartlett's"),
@@ -188,7 +189,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     if (isRaw && options[["bonettTest"]]) {
       res <- try(.computeBonettTest(y, group, depName), silent = TRUE)
       if (isTryError(res)) {
-        outputTable$setError(gettext(as.character(res)))
+        outputTable$setError(.extractErrorMessage(res))
         return()
       }
       if (!is.null(res$error)) {
@@ -203,6 +204,21 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   outputTable$addRows(rows)
 
   return()
+}
+
+# Levene's test centered on the group median (the Brown-Forsythe variant):
+# a one-way ANOVA on the absolute deviations from each group's median.
+# Reproduces car::leveneTest(y ~ group, center = median) exactly (car itself
+# fits anova(lm(|y - median| ~ group))), so no car dependency is needed.
+.leveneTestMV <- function(y, group) {
+  group <- droplevels(as.factor(group))
+  meds  <- tapply(y, group, median)
+  resp  <- abs(y - meds[group])
+  tab   <- anova(lm(resp ~ group))
+  list(statistic = tab[["F value"]][1],
+       df1       = tab[["Df"]][1],
+       df2       = tab[["Df"]][2],
+       p.value   = tab[["Pr(>F)"]][1])
 }
 
 .computeBonettTest <- function(y, group, varName) {
@@ -466,15 +482,16 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   if (.ciMethodMV(options) == "bonett") {
     ciRes <- try(DescTools::VarCI(subY, method = "bonett", conf.level = options[["confLevel"]]), silent = TRUE)
 
-    # TODO perhaps return an error message here
+    # Degrade gracefully: a failed Bonett CI shows as empty cells rather than
+    # aborting the whole descriptives table (matches how other groups are handled).
     if (isTryError(ciRes))
       return(c(NA, NA))
 
     return(c(ciRes["lwr.ci"], ciRes["upr.ci"]))
   }
 
-  # TODO check that these computations are correct
-  # Default: chi-square method
+  # Chi-square CI for a variance: (n-1)s^2 / X^2_{1-a/2} < sigma^2 < (n-1)s^2 / X^2_{a/2}.
+  # Verified identical to DescTools::VarCI(method = "classic").
   df    <- length(subY) - 1
   alpha <- 1 - options[["confLevel"]]
   lower <- df * varEst / qchisq(1 - alpha/2, df)
@@ -677,7 +694,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   levels <- levels(factor)
 
   for (depName in options[["dependent"]]) {
-    varContainer <- createJaspContainer(title = gettext(depName))
+    varContainer <- createJaspContainer(title = jaspBase::decodeColNames(depName))
     qqContainer[[depName]] <- varContainer
 
     y <- dataset[[depName]]
@@ -747,7 +764,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   horiz      <- options[["rainCloudPlotHorizontal"]]
 
   for (depName in options[["dependent"]]) {
-    tempPlot <- createJaspPlot(title = gettext(depName), height = 320, width = 480)
+    tempPlot <- createJaspPlot(title = jaspBase::decodeColNames(depName), height = 320, width = 480)
     rainContainer[[depName]] <- tempPlot
 
     plotDat <- na.omit(data.frame(y = dataset[[depName]], group = factor))
@@ -790,8 +807,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   factor     <- as.factor(dataset[[factorName]])
 
   for (depName in options[["dependent"]]) {
-    # TODO check if it is actually advised to wrap variable name titles into gettext
-    tempPlot <- createJaspPlot(title = gettext(depName), height = 350, width = 500)
+    tempPlot <- createJaspPlot(title = jaspBase::decodeColNames(depName), height = 350, width = 500)
     boxContainer[[depName]] <- tempPlot
 
     plotDat <- na.omit(data.frame(y = dataset[[depName]], group = factor))
@@ -848,7 +864,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   methodLab <- if (useBonett) gettext("Bonett") else gettext("F-test")
 
   for (depName in .getDepNamesMV(options)) {
-    plotTitle    <- if (depName == "") gettext("Variance Ratio") else gettext(depName)
+    plotTitle    <- if (depName == "") gettext("Variance Ratio") else jaspBase::decodeColNames(depName)
     containerKey <- if (depName == "") "summarized" else depName
     tempPlot     <- createJaspPlot(title = plotTitle, height = 250, width = 500)
     ratioContainer[[containerKey]] <- tempPlot
@@ -928,7 +944,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   yLabel     <- if (options[["inputType"]] == "rawData") options[["factor"]] else gettext("Group")
 
   for (depName in .getDepNamesMV(options)) {
-    plotTitle    <- if (depName == "") gettext("Variance Estimate") else gettext(depName)
+    plotTitle    <- if (depName == "") gettext("Variance Estimate") else jaspBase::decodeColNames(depName)
     containerKey <- if (depName == "") "summarized" else depName
     tempPlot     <- createJaspPlot(title = plotTitle, height = 350, width = 500)
     estContainer[[containerKey]] <- tempPlot
