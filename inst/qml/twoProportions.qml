@@ -96,6 +96,26 @@ Form
 
 	Group
 	{
+		title:	qsTr("Tests")
+
+		CheckBox
+		{
+			name:		"chiSquaredTest"
+			label:		qsTr("χ² test")
+			checked:	true
+			info:		qsTr("Pearson's χ² test comparing the two proportions (with optional continuity correction).")
+		}
+
+		CheckBox
+		{
+			name:	"fisherTest"
+			label:	qsTr("Fisher's exact test")
+			info:	qsTr("Fisher's exact test for the 2×2 table. Reports an exact p-value (respecting the chosen alternative) and, in the Effect Sizes table, the conditional maximum-likelihood odds ratio with an exact confidence interval. Recommended for small samples where the χ² approximation is unreliable.")
+		}
+	}
+
+	Group
+	{
 		title:	qsTr("Additional Statistics")
 
 		CheckBox

@@ -14,9 +14,10 @@ test_that("Two proportions (individual data) matches", {
   options$descriptivesDisplay <- "counts"
   results <- jaspTools::runAnalysis("twoProportions", "debug.csv", options)
 
+  # fields per row flattened alphabetically: df, p, statistic, test, vovkSellke
   main <- results[["results"]][["mainTable"]][["data"]]
   jaspTools::expect_equal_tables(main, list(
-    1.477833, 1, 0.224114, 1.097542
+    1, 0.224114, 1.477833, "χ²", 1.097542
   ))
 
   # rows flattened alphabetically: estimate, lower, measure, upper
@@ -34,6 +35,32 @@ test_that("Two proportions (individual data) matches", {
   ))
 })
 
+test_that("Fisher's exact test adds a test row and exact odds ratio", {
+  options <- .tpOptions()
+  options$factor     <- "facGender"
+  options$successes  <- "contBinom"
+  options$fisherTest <- TRUE
+  options$oddsRatio  <- TRUE
+  results <- jaspTools::runAnalysis("twoProportions", "debug.csv", options)
+
+  # Main table has a χ² row and a Fisher row (blank statistic/df on Fisher).
+  # Fields alphabetical per row: df, p, statistic, test.
+  main <- results[["results"]][["mainTable"]][["data"]]
+  jaspTools::expect_equal_tables(main, list(
+    1,  0.224114,  1.477833, "χ²",
+    "", 0.3110567, "",       "Fisher's exact"
+  ))
+
+  # Effect sizes gain the conditional-MLE odds ratio with an exact CI.
+  # Fields alphabetical per row: estimate, lower, measure, upper.
+  es <- results[["results"]][["effectSizeTable"]][["data"]]
+  jaspTools::expect_equal_tables(es, list(
+    0.12,             -0.0720364670542123, "Difference (p₁ − p₂)",         0.312036467054212,
+    1.64102564102564,  0.736775976647093,  "Odds ratio",                   3.65506645148599,
+    1.632796,          0.6843958,          "Odds ratio (Fisher's exact)",  3.95343
+  ))
+})
+
 test_that("One-sided alternative changes the p-value", {
   options <- .tpOptions()
   options$factor      <- "facGender"
@@ -44,7 +71,7 @@ test_that("One-sided alternative changes the p-value", {
 
   main <- results[["results"]][["mainTable"]][["data"]]
   jaspTools::expect_equal_tables(main, list(
-    1.477833, 1, 0.112057, 1.499930
+    1, 0.112057, 1.477833, "χ²", 1.499930
   ))
 })
 
@@ -58,7 +85,7 @@ test_that("Two proportions (aggregated data) matches", {
   results <- jaspTools::runAnalysis("twoProportions", aggData, options)
 
   main <- results[["results"]][["mainTable"]][["data"]]
-  jaspTools::expect_equal_tables(main, list(9.090909091, 1, 0.002568832))
+  jaspTools::expect_equal_tables(main, list(1, 0.002568832, 9.090909091, "χ²"))
 
   es <- results[["results"]][["effectSizeTable"]][["data"]]
   jaspTools::expect_equal_tables(es, list(

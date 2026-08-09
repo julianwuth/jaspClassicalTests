@@ -20,7 +20,7 @@
 # Shared input reshaping, validation and descriptives live in proportionsCommon.R.
 
 #' @import jaspBase
-#' @importFrom stats prop.test qnorm
+#' @importFrom stats prop.test fisher.test qnorm
 #' @export
 twoProportions <- function(jaspResults, dataset, options, ...) {
 
@@ -52,13 +52,14 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
 
   mainTable <- createJaspTable(title = gettext("Test of Two Proportions"))
   mainTable$dependOn(c("factor", "successes", "sampleSize", "alternative",
-                       "continuityCorrection", "vovkSellke"))
+                       "continuityCorrection", "chiSquaredTest", "fisherTest", "vovkSellke"))
   mainTable$position <- 1
   mainTable$showSpecifiedColumnsOnly <- TRUE
 
-  mainTable$addColumnInfo(name = "chisq", title = "χ²",       type = "number")
-  mainTable$addColumnInfo(name = "df",    title = gettext("df"), type = "integer")
-  mainTable$addColumnInfo(name = "p",     title = gettext("p"),  type = "pvalue")
+  mainTable$addColumnInfo(name = "test",      title = gettext("Test"),      type = "string")
+  mainTable$addColumnInfo(name = "statistic", title = gettext("Statistic"), type = "number")
+  mainTable$addColumnInfo(name = "df",        title = gettext("df"),        type = "integer")
+  mainTable$addColumnInfo(name = "p",         title = gettext("p"),         type = "pvalue")
 
   if (options[["vovkSellke"]]) {
     mainTable$addColumnInfo(name = "vovkSellke", title = gettextf("VS-MPR%s", "*"), type = "number")
@@ -70,18 +71,38 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
   if (!ready)
     return()
 
-  res <- .tpTest(data, options)
-  if (isTryError(res)) {
-    mainTable$setError(.extractErrorMessage(res))
-    return()
+  rows <- list()
+
+  if (options[["chiSquaredTest"]]) {
+    res <- .tpTest(data, options)
+    if (isTryError(res)) {
+      mainTable$setError(.extractErrorMessage(res))
+      return()
+    }
+    chiRow <- list(test = "χ²", statistic = unname(res$statistic),
+                   df = unname(res$parameter), p = res$p.value)
+    if (options[["vovkSellke"]])
+      chiRow$vovkSellke <- VovkSellkeMPR(res$p.value)
+    rows[[length(rows) + 1]] <- chiRow
   }
 
-  row <- list(chisq = unname(res$statistic), df = unname(res$parameter), p = res$p.value)
-  if (options[["vovkSellke"]])
-    row$vovkSellke <- VovkSellkeMPR(res$p.value)
+  if (options[["fisherTest"]]) {
+    fish <- .tpFisherTest(data, options)
+    if (isTryError(fish)) {
+      mainTable$setError(.extractErrorMessage(fish))
+      return()
+    }
+    fishRow <- list(test = gettext("Fisher's exact"), statistic = NA_real_,
+                    df = NA_integer_, p = fish$p.value)
+    if (options[["vovkSellke"]])
+      fishRow$vovkSellke <- VovkSellkeMPR(fish$p.value)
+    rows[[length(rows) + 1]] <- fishRow
+  }
 
-  mainTable$addRows(row)
-  .tpAddGroupFootnote(mainTable, data)
+  if (length(rows) > 0) {
+    mainTable$addRows(rows)
+    .tpAddGroupFootnote(mainTable, data)
+  }
 
   return()
 }
@@ -94,7 +115,7 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
 
   esTable <- createJaspTable(title = gettext("Effect Sizes"))
   esTable$dependOn(c("factor", "successes", "sampleSize", "continuityCorrection",
-                     "relativeRisk", "oddsRatio", "ci", "ciLevel"))
+                     "relativeRisk", "oddsRatio", "fisherTest", "ci", "ciLevel"))
   esTable$position <- 2
   esTable$showSpecifiedColumnsOnly <- TRUE
 
@@ -131,6 +152,20 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
   try(prop.test(data$successes, data$sampleSize,
                 alternative = options[["alternative"]],
                 correct     = options[["continuityCorrection"]]),
+      silent = TRUE)
+}
+
+# 2x2 table, rows = groups, cols = (success, failure). byrow = TRUE keeps the
+# odds-ratio / "greater"/"less" direction aligned with prop.test (group 1 vs 2).
+.tpFisherMatrix <- function(data) {
+  x1 <- data$successes[1]; n1 <- data$sampleSize[1]
+  x2 <- data$successes[2]; n2 <- data$sampleSize[2]
+  matrix(c(x1, n1 - x1, x2, n2 - x2), nrow = 2, byrow = TRUE)
+}
+
+# Directional exact p-value; continuity correction does not apply to Fisher.
+.tpFisherTest <- function(data, options) {
+  try(fisher.test(.tpFisherMatrix(data), alternative = options[["alternative"]]),
       silent = TRUE)
 }
 
@@ -172,6 +207,19 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
     if (withCI && !valid)
       footnotes <- c(footnotes, gettext("The odds-ratio confidence interval is undefined when a cell count is zero."))
     rows <- rbind(rows, .tpRow(gettext("Odds ratio"), or, ci[1], ci[2], withCI))
+  }
+
+  # Conditional-MLE odds ratio from Fisher's exact test with a two-sided exact
+  # CI (estimate is alternative-independent; fisher.test tolerates zero cells).
+  if (options[["fisherTest"]]) {
+    fishEs <- try(fisher.test(.tpFisherMatrix(data), alternative = "two.sided",
+                              conf.level = options[["ciLevel"]]),
+                  silent = TRUE)
+    if (!isTryError(fishEs)) {
+      fishCi <- if (withCI) fishEs$conf.int else c(NA_real_, NA_real_)
+      rows   <- rbind(rows, .tpRow(gettext("Odds ratio (Fisher's exact)"),
+                                   unname(fishEs$estimate), fishCi[1], fishCi[2], withCI))
+    }
   }
 
   attr(rows, "footnotes") <- footnotes
