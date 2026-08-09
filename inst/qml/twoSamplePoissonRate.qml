@@ -239,7 +239,7 @@ Form
 				label:   qsTr("Pooled standard error")
 				checked: true
 				visible: targetDifference.checked
-				info:    qsTr("Use the pooled rate estimate for the z statistic. Only relevant when testing the difference.")
+				info:    qsTr("Use the pooled rate estimate for the z statistic. Only relevant when testing the difference. This affects the test statistic and p-value only: The confidence interval is always based on the unpooled standard error, because the pooled estimate is valid only under the null hypothesis. The pooled estimate assumes a hypothesized difference of 0; with a nonzero hypothesized difference, select the unpooled standard error.")
 			}
 		}
 	}

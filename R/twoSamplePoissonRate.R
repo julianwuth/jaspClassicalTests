@@ -152,7 +152,9 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   })
 
   descTable$setData(do.call(rbind, rows))
-  descTable$addFootnote(gettext("Confidence interval based on exact Poisson distribution."))
+
+  if (options[["descriptiveCi"]])
+    descTable$addFootnote(gettext("Confidence interval based on exact Poisson distribution."))
 
   return()
 }
@@ -415,6 +417,13 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   sePooled   <- sqrt(pooledRate * (1 / T1 + 1 / T2))
   seUnpooled <- sqrt(g1$rate / T1 + g2$rate / T2)
   se         <- if (options[["pooledSe"]]) sePooled else seUnpooled
+
+  # The pooled rate is the null-restricted estimate only when the hypothesized
+  # difference is 0; otherwise the pooled standard error does not match H0.
+  if (options[["pooledSe"]] && d0 != 0)
+    outputTable$addFootnote(
+      gettextf("The pooled standard error assumes a hypothesized difference of 0, but the hypothesized difference is %.4g. Select the unpooled standard error instead.", d0),
+      symbol = gettext("<b>Warning:</b>"))
 
   if (!is.finite(se) || se == 0) {
     outputTable$setError(gettext("Normal approximation for the difference could not be computed (zero standard error)."))
