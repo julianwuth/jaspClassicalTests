@@ -219,7 +219,7 @@ twoCorrelations <- function(jaspResults, dataset, options, ...) {
     .twoCorDiffRow(r1 - r2, test$z, test$p, ci, options)
   )
 
-  footnotes <- gettext("Fisher's (1925) z test and Zou's (2007) confidence interval for the difference between two independent correlations.")
+  footnotes <- gettext("Fisher's (1925) z-test and Zou's (2007) confidence interval for the difference between two independent correlations.")
 
   return(list(rows = do.call(rbind, rows), footnotes = footnotes, error = NULL))
 }
@@ -268,7 +268,7 @@ twoCorrelations <- function(jaspResults, dataset, options, ...) {
     label2 <- gettextf("Correlation (%1$s, %2$s)",
                        jaspBase::decodeColNames(vars[1]), jaspBase::decodeColNames(vars[3]))
     r1 <- r.jk; r2 <- r.jh
-    footnotes <- gettext("Steiger's (1980) z test and Zou's (2007) confidence interval for the difference between two overlapping correlations.")
+    footnotes <- gettext("Steiger's (1980) z-test and Zou's (2007) confidence interval for the difference between two overlapping correlations.")
   } else {
     # j = var1, k = var2, h = var3, m = var4; compare r.jk with r.hm
     r.jk <- corMat[1, 2]; r.hm <- corMat[3, 4]
@@ -283,7 +283,7 @@ twoCorrelations <- function(jaspResults, dataset, options, ...) {
     label2 <- gettextf("Correlation (%1$s, %2$s)",
                        jaspBase::decodeColNames(vars[3]), jaspBase::decodeColNames(vars[4]))
     r1 <- r.jk; r2 <- r.hm
-    footnotes <- gettext("Steiger's (1980) z test and Zou's (2007) confidence interval for the difference between two non-overlapping correlations.")
+    footnotes <- gettext("Steiger's (1980) z-test and Zou's (2007) confidence interval for the difference between two non-overlapping correlations.")
   }
 
   rows <- list(

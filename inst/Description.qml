@@ -23,29 +23,29 @@ Description
 
 	Analysis
 	{
-		title: qsTr("One Mean") // Title for window
-		menu: qsTr("One Mean")  // Title for ribbon
-		func: "oneSampleTests"           // Function to be called
-		qml: "oneSampleTests.qml"               // Design input window
+		title: qsTr("One Mean") 
+		menu: qsTr("One Mean")  
+		func: "oneSampleTests"
+		qml: "oneSampleTests.qml"
 		requiresData: true                
 	}
 	
 
 	Analysis
 	{
-		title: qsTr("Two Independent Means") // Title for window
-		menu: qsTr("Two Independent Means")  // Title for ribbon
-		func: "independentSamplesTests"           // Function to be called
-		qml: "independentSamplesTests.qml"               // Design input window
+		title: qsTr("Two Independent Means") 
+		menu: qsTr("Two Independent Means")  
+		func: "independentSamplesTests"
+		qml: "independentSamplesTests.qml"
 		requiresData: true                
 	}
 
 	Analysis
 	{
-		title: qsTr("Two Dependent Means") // Title for window
-		menu: qsTr("Two Dependent Means")  // Title for ribbon
-		func: "pairedSamplesTests"           // Function to be called
-		qml: "pairedSamplesTests.qml"               // Design input window
+		title: qsTr("Two Dependent Means") 
+		menu: qsTr("Two Dependent Means")  
+		func: "pairedSamplesTests"
+		qml: "pairedSamplesTests.qml"
 		requiresData: true                
 	}
 
@@ -59,28 +59,28 @@ Description
 
 	Analysis
 	{
-		title: qsTr("One Proportion") // Title for window
-		menu: qsTr("One Proportion")  // Title for ribbon
-		func: "singleProportion"           // Function to be called
-		qml: "singleProportion.qml"               // Design input window
+		title: qsTr("One Proportion") 
+		menu: qsTr("One Proportion")  
+		func: "singleProportion"
+		qml: "singleProportion.qml"
 		requiresData: true                
 	}
 
 	Analysis
 	{
-		title: qsTr("Two Proportions") // Title for window
-		menu: qsTr("Two Proportions")  // Title for ribbon
-		func: "twoProportions"           // Function to be called
-		qml: "twoProportions.qml"               // Design input window
+		title: qsTr("Two Proportions") 
+		menu: qsTr("Two Proportions")  
+		func: "twoProportions"
+		qml: "twoProportions.qml"
 		requiresData: true
 	}
 
 	Analysis
 	{
-		title: qsTr("> 2 Proportions") // Title for window
-		menu: qsTr("> 2 Proportions")  // Title for ribbon
-		func: "multipleProportions"           // Function to be called
-		qml: "multipleProportions.qml"               // Design input window
+		title: qsTr("> 2 Proportions") 
+		menu: qsTr("> 2 Proportions")  
+		func: "multipleProportions"
+		qml: "multipleProportions.qml"
 		requiresData: true
 	}
 
@@ -120,19 +120,19 @@ Description
 
 	Analysis
 	{
-		title: qsTr("One Variance") // Title for window
-		menu: qsTr("One Variance")  // Title for ribbon
-		func: "singleVariance"           // Function to be called
-		qml: "singleVariance.qml"               // Design input window
-		requiresData: false                
+		title: qsTr("One Variance")
+		menu: qsTr("One Variance")
+		func: "singleVariance"
+		qml: "singleVariance.qml"
+		requiresData: false
 	}
 
 	Analysis
 	{
-		title: qsTr("Multiple Variances") // Title for window
-		menu: qsTr("Multiple Variances")  // Title for ribbon
-		func: "multipleVariances"           // Function to be called
-		qml: "multipleVariances.qml"               // Design input window
+		title: qsTr("Multiple Variances")
+		menu: qsTr("Multiple Variances")
+		func: "multipleVariances"
+		qml: "multipleVariances.qml"
 		requiresData: false
 	}
 
@@ -146,28 +146,28 @@ Description
 
 	Analysis
 	{
-		title: qsTr("One Correlation") // Title for window
-		menu: qsTr("One Correlation")  // Title for ribbon
-		func: "oneCorrelation"           // Function to be called
-		qml: "oneCorrelation.qml"               // Design input window
+		title: qsTr("One Correlation") 
+		menu: qsTr("One Correlation")  
+		func: "oneCorrelation"
+		qml: "oneCorrelation.qml"
 		requiresData: true
 	}
 
 	Analysis
 	{
-		title: qsTr("Two Correlations") // Title for window
-		menu: qsTr("Two Correlations")  // Title for ribbon
-		func: "twoCorrelations"           // Function to be called
-		qml: "twoCorrelations.qml"               // Design input window
+		title: qsTr("Two Correlations") 
+		menu: qsTr("Two Correlations")  
+		func: "twoCorrelations"
+		qml: "twoCorrelations.qml"
 		requiresData: true
 	}
 
 	Analysis
 	{
-		title: qsTr("> 2 Correlations") // Title for window
-		menu: qsTr("> 2 Correlations")  // Title for ribbon
-		func: "multipleCorrelations"           // Function to be called
-		qml: "multipleCorrelations.qml"               // Design input window
+		title: qsTr("> 2 Correlations") 
+		menu: qsTr("> 2 Correlations")  
+		func: "multipleCorrelations"
+		qml: "multipleCorrelations.qml"
 		requiresData: true
 	}
 }
