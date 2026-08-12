@@ -5,6 +5,7 @@ options$independentVariable1 <- "contcor1"
 options$independentVariable2 <- "contcor2"
 options$groupingVariable     <- "facGender"
 options$ci                   <- TRUE
+options$scatterPlot          <- FALSE # the scatter plots have their own tests below
 set.seed(1)
 results <- runAnalysis("twoCorrelations", "debug.csv", options)
 
@@ -27,6 +28,7 @@ test_that("Two Correlations dependent overlapping table matches (validated vs co
   options$overlapVariable1 <- "contcor1"
   options$overlapVariable2 <- "contcor2"
   options$ci              <- TRUE
+  options$scatterPlot     <- FALSE
   set.seed(1)
   results <- runAnalysis("twoCorrelations", "debug.csv", options)
   table <- results[["results"]][["outputTable"]][["data"]]
@@ -48,6 +50,7 @@ test_that("Two Correlations dependent non-overlapping table matches (validated v
   options$nonoverlapVariable3 <- "contNormal"
   options$nonoverlapVariable4 <- "contGamma"
   options$ci                  <- TRUE
+  options$scatterPlot         <- FALSE
   set.seed(1)
   results <- runAnalysis("twoCorrelations", "debug.csv", options)
   table <- results[["results"]][["outputTable"]][["data"]]
@@ -66,7 +69,60 @@ test_that("Two Correlations errors when grouping factor has != 2 levels", {
   options$independentVariable1 <- "contcor1"
   options$independentVariable2 <- "contcor2"
   options$groupingVariable     <- "facFive"
+  options$scatterPlot          <- FALSE
   set.seed(1)
   results <- runAnalysis("twoCorrelations", "debug.csv", options)
   expect_identical(results[["status"]], "validationError")
+})
+
+########## scatter plots (on by default), one per sample layout ##########
+.tcFirstScatterPlot <- function(results) {
+  plotName <- results[["results"]][["scatterPlots"]][["collection"]][["scatterPlots_scatterPlot1"]][["data"]]
+  results[["state"]][["figures"]][[plotName]][["obj"]]
+}
+
+test_that("Two Correlations scatter plot (independent groups) matches", {
+  options <- analysisOptions("twoCorrelations")
+  options$samples              <- "independent"
+  options$independentVariable1 <- "contcor1"
+  options$independentVariable2 <- "contcor2"
+  options$groupingVariable     <- "facGender"
+  set.seed(1)
+  results <- runAnalysis("twoCorrelations", "debug.csv", options)
+  skip_if(results$status == "fatalError", "jaspGraphs/ggplot2 version incompatibility")
+
+  # both correlations share the same axes, so the two groups go into a single plot
+  expect_length(results[["results"]][["scatterPlots"]][["collection"]], 1)
+  jaspTools::expect_equal_plots(.tcFirstScatterPlot(results), "scatter-plot-independent")
+})
+
+test_that("Two Correlations scatter plots (dependent, overlapping) match", {
+  options <- analysisOptions("twoCorrelations")
+  options$samples          <- "dependent"
+  options$dependentType    <- "overlapping"
+  options$commonVariable   <- "contNormal"
+  options$overlapVariable1 <- "contcor1"
+  options$overlapVariable2 <- "contcor2"
+  set.seed(1)
+  results <- runAnalysis("twoCorrelations", "debug.csv", options)
+  skip_if(results$status == "fatalError", "jaspGraphs/ggplot2 version incompatibility")
+
+  expect_length(results[["results"]][["scatterPlots"]][["collection"]], 2)
+  jaspTools::expect_equal_plots(.tcFirstScatterPlot(results), "scatter-plot-overlapping")
+})
+
+test_that("Two Correlations scatter plots (dependent, non-overlapping) match", {
+  options <- analysisOptions("twoCorrelations")
+  options$samples             <- "dependent"
+  options$dependentType       <- "nonoverlapping"
+  options$nonoverlapVariable1 <- "contcor1"
+  options$nonoverlapVariable2 <- "contcor2"
+  options$nonoverlapVariable3 <- "contNormal"
+  options$nonoverlapVariable4 <- "contGamma"
+  set.seed(1)
+  results <- runAnalysis("twoCorrelations", "debug.csv", options)
+  skip_if(results$status == "fatalError", "jaspGraphs/ggplot2 version incompatibility")
+
+  expect_length(results[["results"]][["scatterPlots"]][["collection"]], 2)
+  jaspTools::expect_equal_plots(.tcFirstScatterPlot(results), "scatter-plot-nonoverlapping")
 })

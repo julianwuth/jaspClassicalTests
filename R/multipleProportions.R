@@ -47,7 +47,7 @@ multipleProportions <- function(jaspResults, dataset, options, ...) {
   mainTable <- createJaspTable(title = gettext("Test of Equal Proportions"))
   mainTable$dependOn(c("factor", "successes", "sampleSize",
                        "continuityCorrection", "vovkSellke"))
-  mainTable$position <- 1
+  mainTable$position <- 3
   mainTable$showSpecifiedColumnsOnly <- TRUE
 
   mainTable$addColumnInfo(name = "chisq", title = "χ²",    type = "number")
@@ -96,6 +96,8 @@ multipleProportions <- function(jaspResults, dataset, options, ...) {
 
   if (!is.null(warn))
     mainTable$addFootnote(warn, symbol = gettext("<b>Warning:</b>"))
+
+  .mpAddMissingFootnote(mainTable, data)
 
   return()
 }

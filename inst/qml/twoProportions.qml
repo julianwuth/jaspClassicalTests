@@ -52,7 +52,7 @@ Form
 			title:			qsTr("Successes")
 			singleVariable:	true
 			allowedColumns:	["scale"]
-			info:			qsTr("For aggregated data, the number of successes per group. For individual data, the binary variable indicating a success or failure.")
+			info:			qsTr("For aggregated data, the number of successes per group. For individual data, the binary variable indicating a success or failure. Rows with an empty cell in any assigned variable are excluded from the analysis.")
 		}
 
 		AssignedVariablesList
@@ -61,7 +61,7 @@ Form
 			title:			qsTr("Sample Size")
 			singleVariable:	true
 			allowedColumns:	["scale"]
-			info:			qsTr("For aggregated data, the total number of observations per group. Leave empty for individual data.")
+			info:			qsTr("For aggregated data, the total number of observations per group. Leave empty for individual data. Rows with an empty cell in any assigned variable are excluded from the analysis.")
 		}
 	}
 
@@ -74,9 +74,9 @@ Form
 		RadioButton
 		{
 			value:		"two.sided"
-			label:		qsTr("Proportions differ")
+			label:		qsTr("Group 1 ≠ Group 2")
 			checked:	true
-			info:		qsTr("Two-sided alternative hypothesis that the two population proportions differ.")
+			info:		qsTr("Two-sided alternative hypothesis that the two groups' proportions are not equal.")
 		}
 
 		RadioButton
@@ -178,6 +178,7 @@ Form
 
 			RadioButton
 			{
+				id:		displayProportions
 				value:	"proportions"
 				label:	qsTr("Proportions")
 				info:	qsTr("Displays the descriptives as proportions.")
@@ -192,14 +193,15 @@ Form
 			{
 				name:	"descriptivesTable"
 				label:	qsTr("Table")
-				info:	qsTr("Displays a table of observed counts or proportions and the sample size per group.")
+				info:	qsTr("Displays a table of observed counts or proportions and the sample size per group. Rows with an empty cell in any of the assigned variables are excluded, and a footnote reports how many were removed.")
 
 				CheckBox
 				{
 					name:				"descriptivesTableCi"
 					label:				qsTr("Confidence interval")
+					enabled:			displayProportions.checked
 					childrenOnSameRow:	true
-					info:				qsTr("Per-group Clopper-Pearson confidence intervals for the proportion.")
+					info:				qsTr("Per-group Clopper-Pearson confidence intervals for the proportion θ. Only available when the descriptives are displayed as proportions.")
 
 					CIField
 					{
@@ -212,13 +214,21 @@ Form
 			{
 				name:	"descriptivesPlot"
 				label:	qsTr("Plot")
-				info:	qsTr("Displays a plot of observed counts or proportions with confidence intervals.")
+				info:	qsTr("Displays a plot of observed counts or proportions.")
 
-				CIField
+				CheckBox
 				{
-					name:	"descriptivesPlotCiLevel"
-					label:	qsTr("Confidence interval")
-					info:	qsTr("Coverage of the confidence intervals in the plot.")
+					name:				"descriptivesPlotCi"
+					label:				qsTr("Confidence interval")
+					checked:			true
+					enabled:			displayProportions.checked
+					childrenOnSameRow:	true
+					info:				qsTr("Adds Clopper-Pearson confidence intervals for θ to the plot. Only available when the descriptives are displayed as proportions.")
+
+					CIField
+					{
+						name:	"descriptivesPlotCiLevel"
+					}
 				}
 			}
 		}

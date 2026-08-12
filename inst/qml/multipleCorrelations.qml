@@ -80,9 +80,9 @@ Form
 	{
 		title: qsTr("Alt. Hypothesis")
 		name: "alternative"
-		RadioButton { value: "twoSided";	label: qsTr("Correlated"); info: qsTr("Two-sided alternative hypothesis that the population correlation does not equal 0.") ; checked: true	}
-		RadioButton { value: "greater";		label: qsTr("Correlated positively"); info: qsTr("One-sided alternative hypothesis that the population correlation is greater than 0.")		}
-		RadioButton { value: "less";		label: qsTr("Correlated negatively"); info: qsTr("One-sided alternative hypothesis that the population correlation is less than 0.")		}
+		RadioButton { value: "twoSided";	label: qsTr("ρ ≠ 0"); info: qsTr("Two-sided alternative hypothesis that the population correlation is not equal to 0.") ; checked: true	}
+		RadioButton { value: "greater";		label: qsTr("ρ > 0"); info: qsTr("One-sided alternative hypothesis that the population correlation is greater than 0.")		}
+		RadioButton { value: "less";		label: qsTr("ρ < 0"); info: qsTr("One-sided alternative hypothesis that the population correlation is less than 0.")		}
 	}
 
 	Group

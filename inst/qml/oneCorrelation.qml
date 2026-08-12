@@ -78,4 +78,35 @@ Form
 		CheckBox { name: "effectSize"; label: qsTr("Effect size (Fisher's z)"); info: qsTr("The Fisher transformed effect size with its standard error.") }
 		CheckBox { name: "vovkSellke"; label: qsTr("Vovk-Sellke maximum p-ratio"); info: qsTr("The maximum ratio of the likelihood of the observed p-value under H1 vs H0.") }
 	}
+
+	Group
+	{
+		title: qsTr("Plots")
+
+		CheckBox
+		{
+			name:    "scatterPlot"
+			label:   qsTr("Scatter plot")
+			checked: true
+			info:    qsTr("Scatter plot of the correlated variables.")
+
+			CheckBox { name: "scatterPlotDensity"; label: qsTr("Densities for variables"); checked: true; info: qsTr("Adds marginal densities above and to the right of the scatter plot.") }
+
+			CheckBox
+			{
+				name:    "scatterPlotRegressionLine"
+				label:   qsTr("Regression line")
+				checked: true
+				info:    qsTr("Adds a linear regression line.")
+
+				CheckBox
+				{
+					name:              "scatterPlotRegressionLineCi"
+					label:             qsTr("Confidence interval")
+					childrenOnSameRow: true
+					CIField { name: "scatterPlotRegressionLineCiLevel" }
+				}
+			}
+		}
+	}
 }

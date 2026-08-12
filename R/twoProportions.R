@@ -29,7 +29,7 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
 
   if (ready) {
     .mpCheckErrors(data, options)
-  } else if (!is.null(data) && nrow(data) != 2) {
+  } else if (!is.null(data) && nrow(data) > 0 && nrow(data) != 2) {
     .quitAnalysis(gettext("This analysis requires the factor to have exactly two levels."))
   }
 
@@ -53,7 +53,7 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
   mainTable <- createJaspTable(title = gettext("Test of Two Proportions"))
   mainTable$dependOn(c("factor", "successes", "sampleSize", "alternative",
                        "continuityCorrection", "chiSquaredTest", "fisherTest", "vovkSellke"))
-  mainTable$position <- 1
+  mainTable$position <- 3
   mainTable$showSpecifiedColumnsOnly <- TRUE
 
   mainTable$addColumnInfo(name = "test",      title = gettext("Test"),      type = "string")
@@ -102,6 +102,7 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
   if (length(rows) > 0) {
     mainTable$addRows(rows)
     .tpAddGroupFootnote(mainTable, data)
+    .mpAddMissingFootnote(mainTable, data)
   }
 
   return()
@@ -116,7 +117,7 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
   esTable <- createJaspTable(title = gettext("Effect Sizes"))
   esTable$dependOn(c("factor", "successes", "sampleSize", "continuityCorrection",
                      "relativeRisk", "oddsRatio", "fisherTest", "ci", "ciLevel"))
-  esTable$position <- 2
+  esTable$position <- 4
   esTable$showSpecifiedColumnsOnly <- TRUE
 
   esTable$addColumnInfo(name = "measure",  title = "",                  type = "string")
@@ -143,6 +144,7 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
   for (note in attr(rows, "footnotes"))
     esTable$addFootnote(note, symbol = gettext("<b>Warning:</b>"))
   .tpAddGroupFootnote(esTable, data)
+  .mpAddMissingFootnote(esTable, data)
 
   return()
 }
@@ -246,5 +248,5 @@ twoProportions <- function(jaspResults, dataset, options, ...) {
 # Note which factor level is treated as group 1 vs group 2.
 .tpAddGroupFootnote <- function(table, data) {
   levels <- as.character(data$level)
-  table$addFootnote(gettextf("Group 1 = %1$s, Group 2 = %2$s.", levels[1], levels[2]))
+  table$addFootnote(gettextf("Group 1 = %1$s; Group 2 = %2$s.", levels[1], levels[2]))
 }

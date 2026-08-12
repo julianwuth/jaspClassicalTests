@@ -18,6 +18,9 @@
 #' @import jaspBase
 #' @export
 singleVariance <- function(jaspResults, dataset, options, ...) {
+  # makes the bootstrap confidence interval reproducible when the user sets a seed
+  jaspBase::.setSeedJASP(options)
+
   # is ready if test is selected and data was provided
   if (options[["inputType"]] == "rawData") {
     ready <- (ncol(dataset) > 0 && options[["chiSquareTest"]])
@@ -29,11 +32,25 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
     ready <- options[["chiSquareTest"]]
   }
 
+  .pruneDisabledOutputSV(jaspResults, options)
+
   .createOutputTableSV(jaspResults, dataset, options, ready)
 
   # assumption checks require raw data
   if (options[["inputType"]] == "rawData")
     .assumptionChecksSV(jaspResults, dataset, options, ready)
+
+  return()
+}
+
+# Output that is merely skipped by its builder (assumption checks after a switch to summarized
+# input, or with both boxes unticked) is not covered by $dependOn(), so drop it explicitly.
+.pruneDisabledOutputSV <- function(jaspResults, options) {
+  wantAssumptionChecks <- options[["inputType"]] == "rawData" &&
+                          (options[["normalityTest"]] || options[["qqPlot"]])
+
+  if (!wantAssumptionChecks)
+    .removeJaspElement(jaspResults, "assumptionChecks")
 
   return()
 }
@@ -56,7 +73,8 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 
   outputTable <- createJaspTable(title = gettext("Single Variance Test"))
   outputTable$dependOn(c("alternative", "chiSquareTest", "ciMethod", "confLevel", "dependent",
-                         "sdEstimate", "testVariance", "varEstimate", "varianceCi",
+                         "sdEstimate", "sdCi", "testVariance", "varEstimate", "varianceCi",
+                         "bootstrapSamples", "setSeed", "seed",
                          "inputType", "sampleVariance", "sampleSize"))
   jaspResults[["outputTable"]] <- outputTable
 
@@ -66,16 +84,22 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
     outputTable$addColumnInfo(name = "varEst", title = gettext("Variance"), type = "number")
 
   if (options[["sdEstimate"]])
-    outputTable$addColumnInfo(name = "sdEst", title = gettext("Std"), type = "number")
+    outputTable$addColumnInfo(name = "sdEst", title = gettext("Std. deviation"), type = "number")
 
   outputTable$addColumnInfo(name = "chiSquare", title = "χ²", type = "number")
   outputTable$addColumnInfo(name = "df",        title = gettext("df"),  type = "integer")
   outputTable$addColumnInfo(name = "pValue",    title = gettext("p"),   type = "pvalue")
 
-  if (options[["varianceCi"]]) {
+  if (.showVarianceCiSV(options)) {
     ciOvertitle <- gettextf("%i%% Confidence Interval<br>Variance", options[["confLevel"]] * 100)
     outputTable$addColumnInfo(name = "ciLower", title = gettext("Lower"), type = "number", overtitle = ciOvertitle)
     outputTable$addColumnInfo(name = "ciUpper", title = gettext("Upper"), type = "number", overtitle = ciOvertitle)
+  }
+
+  if (.showSdCiSV(options)) {
+    sdOvertitle <- gettextf("%i%% Confidence Interval<br>Std. Deviation", options[["confLevel"]] * 100)
+    outputTable$addColumnInfo(name = "sdCiLower", title = gettext("Lower"), type = "number", overtitle = sdOvertitle)
+    outputTable$addColumnInfo(name = "sdCiUpper", title = gettext("Upper"), type = "number", overtitle = sdOvertitle)
   }
 
   outputTable$showSpecifiedColumnsOnly <- TRUE
@@ -104,10 +128,15 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
   res$varName <- vapply(varData[keep], `[[`, character(1), "name")
   outputTable$setData(res)
 
+  # name the confidence interval method actually used, and flag its small-sample caveat
+  if (.showVarianceCiSV(options) || .showSdCiSV(options))
+    .varianceCiFootnotesVar(outputTable, options,
+                            minN = min(vapply(varData[keep], function(entry) as.numeric(entry[["n"]]), numeric(1))))
+
   # add footnote describing the hypothesis
   outputTable$addFootnote(
     switch(options[["alternative"]],
-           "two.sided" = gettextf("Variances tested against value: %.2f.", round(options[["testVariance"]], 2)), # explicit rounding because gettextf would round 2.255 to 2.25
+           "two.sided" = gettextf("For all tests, the alternative hypothesis is that the variance is not equal to %.2f.", round(options[["testVariance"]], 2)), # explicit rounding because gettextf would round 2.255 to 2.25
            "greater" = gettextf("For all tests, the alternative hypothesis is that the variance is greater than %.2f.", round(options[["testVariance"]], 2)),
            "less" = gettextf("For all tests, the alternative hypothesis is that the variance is less than %.2f.", round(options[["testVariance"]], 2))
     )
@@ -144,27 +173,37 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
   pValue <- out$p.value
   df <- out$parameter[1]
 
-  # Bonett CI needs the raw values (kurtosis); force chi-square method for summarized input
-  useBonett <- options[["ciMethod"]] == "bonett" && options[["inputType"]] == "rawData"
-
-  if (!useBonett) {
-    ciLower <- out$conf.int[1]
-    ciUpper <- out$conf.int[2]
-  } else { # Bonett method
-    ciRes <- try(DescTools::VarCI(col, method = "bonett", conf.level = options[["confLevel"]],
-                                  sides = .getSidesCi(options)), silent = TRUE)
-    if (isTryError(ciRes)) {
-      outputTable$setError(.extractErrorMessage(ciRes))
+  # VarTest already returns the chi-square interval honouring `alternative`; Bonett and the
+  # bootstrap need the raw values, so .ciMethodVar falls back to chi-square for summarized input.
+  # Skip the (potentially expensive) bootstrap entirely when no interval is displayed.
+  if (.ciMethodVar(options) == "chiSquare" ||
+      !(.showVarianceCiSV(options) || .showSdCiSV(options))) {
+    ciRes <- list(lower = out$conf.int[1], upper = out$conf.int[2], error = NULL)
+  } else {
+    ciRes <- .varianceCi(col, options, sides = .getSidesCi(options))
+    if (!is.null(ciRes$error)) {
+      outputTable$setError(ciRes$error)
       return(NULL)
     }
-
-    ciLower <- ciRes["lwr.ci"]
-    ciUpper <- ciRes["upr.ci"]
   }
 
+  sdCiRes <- .sdCiFromVarianceCi(ciRes)
+
   # remove row names that are induced by the package
-  return(data.frame(varEst, sdEst, chiSquare,
-                    df, pValue, ciLower, ciUpper, row.names = NULL))
+  return(data.frame(varEst, sdEst, chiSquare, df, pValue,
+                    ciLower   = ciRes$lower,   ciUpper   = ciRes$upper,
+                    sdCiLower = sdCiRes$lower, sdCiUpper = sdCiRes$upper,
+                    row.names = NULL))
+}
+
+# The confidence interval columns require both the estimate and its interval checkbox, mirroring
+# the QML where each interval is nested under its estimate.
+.showVarianceCiSV <- function(options) {
+  return(options[["varEstimate"]] && options[["varianceCi"]])
+}
+
+.showSdCiSV <- function(options) {
+  return(options[["sdEstimate"]] && options[["sdCi"]])
 }
 
 .getSidesCi <- function(options) {
@@ -177,6 +216,10 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 
 
 .assumptionChecksSV <- function(jaspResults, dataset, options, ready) {
+  # never emit an empty titled container when neither check is requested
+  if (!options[["normalityTest"]] && !options[["qqPlot"]])
+    return()
+
   if(!is.null(jaspResults[["assumptionChecks"]]))
     return()
 

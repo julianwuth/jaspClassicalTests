@@ -28,10 +28,29 @@ test_that("Two proportions (individual data) matches", {
     1.64102564102564,  0.736775976647093,   "Odds ratio",           3.65506645148599
   ))
 
+  # The CI is an interval for the proportion, so it is suppressed on the count scale:
+  # level, observed, size only.
   desc <- results[["results"]][["descriptivesTable"]][["data"]]
   jaspTools::expect_equal_tables(desc, list(
-    "f", 16.830254580173, 24, 50, 31.2924027460453,
-    "m", 11.4578533410294, 18, 50, 25.4034323857199
+    "f", 24, 50,
+    "m", 18, 50
+  ))
+})
+
+test_that("Descriptives CI is shown on the proportion scale", {
+  options <- .tpOptions()
+  options$factor              <- "facGender"
+  options$successes           <- "contBinom"
+  options$descriptivesTable   <- TRUE
+  options$descriptivesTableCi <- TRUE
+  options$descriptivesDisplay <- "proportions"
+  results <- jaspTools::runAnalysis("twoProportions", "debug.csv", options)
+
+  # rows flattened alphabetically: level, lowerCI, observed, size, upperCI
+  desc <- results[["results"]][["descriptivesTable"]][["data"]]
+  jaspTools::expect_equal_tables(desc, list(
+    "f", 0.336605091603459, 0.48, 50, 0.625848054920906,
+    "m", 0.229157066820588, 0.36, 50, 0.508068647714399
   ))
 })
 
@@ -118,6 +137,67 @@ test_that("Zero success count yields NA relative-risk/odds-ratio CI with warning
   notes <- vapply(results[["results"]][["effectSizeTable"]][["footnotes"]], `[[`, character(1), "text")
   expect_true(any(grepl("relative-risk confidence interval is undefined", notes)))
   expect_true(any(grepl("odds-ratio confidence interval is undefined", notes)))
+})
+
+test_that("Trailing empty rows are dropped and reported", {
+  # Blank spreadsheet rows below the data arrive as NA in every assigned column.
+  naData <- data.frame(grp  = factor(c("A", "B", NA, NA)),
+                       succ = c(20, 35, NA, NA),
+                       n    = c(50, 50, NA, NA))
+  options <- .tpOptions()
+  options$factor     <- "grp"
+  options$successes  <- "succ"
+  options$sampleSize <- "n"
+  options$oddsRatio  <- TRUE
+  results <- jaspTools::runAnalysis("twoProportions", naData, options)
+
+  expect_equal(results[["status"]], "complete")
+
+  # Same numbers as the clean frame in "Two proportions (aggregated data) matches".
+  main <- results[["results"]][["mainTable"]][["data"]]
+  jaspTools::expect_equal_tables(main, list(1, 0.002568832, 9.090909091, "χ²"))
+
+  es <- results[["results"]][["effectSizeTable"]][["data"]]
+  jaspTools::expect_equal_tables(es, list(
+    -0.3,               -0.485938509691368, "Difference (p₁ − p₂)", -0.114061490308631,
+    0.285714285714286,  0.124805479367825,  "Odds ratio",           0.654079079498087
+  ))
+
+  notes <- vapply(results[["results"]][["mainTable"]][["footnotes"]], `[[`, character(1), "text")
+  expect_true(any(grepl("2 rows with missing values were removed", notes)))
+})
+
+test_that("A partially filled row is dropped and reported in the singular", {
+  naData <- data.frame(grp  = factor(c("A", "B", "A")),
+                       succ = c(20, 35, NA),
+                       n    = c(50, 50, 10))
+  options <- .tpOptions()
+  options$factor     <- "grp"
+  options$successes  <- "succ"
+  options$sampleSize <- "n"
+  results <- jaspTools::runAnalysis("twoProportions", naData, options)
+
+  expect_equal(results[["status"]], "complete")
+
+  main <- results[["results"]][["mainTable"]][["data"]]
+  jaspTools::expect_equal_tables(main, list(1, 0.002568832, 9.090909091, "χ²"))
+
+  notes <- vapply(results[["results"]][["mainTable"]][["footnotes"]], `[[`, character(1), "text")
+  expect_true(any(grepl("1 row with missing values was removed", notes)))
+})
+
+test_that("An all-empty frame does not abort", {
+  naData <- data.frame(grp  = factor(c(NA, NA), levels = c("A", "B")),
+                       succ = c(NA_real_, NA_real_),
+                       n    = c(NA_real_, NA_real_))
+  options <- .tpOptions()
+  options$factor     <- "grp"
+  options$successes  <- "succ"
+  options$sampleSize <- "n"
+  results <- jaspTools::runAnalysis("twoProportions", naData, options)
+
+  expect_equal(results[["status"]], "complete")
+  expect_length(results[["results"]][["mainTable"]][["data"]], 0)
 })
 
 test_that("Factor with more than two levels aborts", {

@@ -23,17 +23,19 @@
 #' @importFrom stats cor cor.test complete.cases pnorm qnorm
 #' @export
 oneCorrelation <- function(jaspResults, dataset, options, ...) {
-  ready <- (options[["firstVariable"]] != "" && options[["secondVariable"]] != "" &&
-              any(c(options[["pearson"]], options[["spearman"]], options[["kendall"]])))
+  # the scatter plot only needs the two variables, the table also needs a coefficient
+  plotReady  <- options[["firstVariable"]] != "" && options[["secondVariable"]] != ""
+  tableReady <- plotReady && any(c(options[["pearson"]], options[["spearman"]], options[["kendall"]]))
 
-  if (ready) {
+  if (plotReady) {
     vars <- c(options[["firstVariable"]], options[["secondVariable"]])
     .hasErrors(dataset, type = c("infinity", "variance", "observations"),
                all.target = vars, observations.amount = "< 3",
                exitAnalysisIfErrors = TRUE)
   }
 
-  .oneCorrelationTable(jaspResults, dataset, options, ready)
+  .oneCorrelationTable(jaspResults, dataset, options, tableReady)
+  .oneCorrelationScatterPlot(jaspResults, dataset, options, plotReady)
 
   return()
 }
@@ -97,7 +99,7 @@ oneCorrelation <- function(jaspResults, dataset, options, ...) {
 .oneCorrelationFootnotes <- function(outputTable, options) {
   testValue <- options[["testValue"]]
   hypLabel  <- switch(options[["alternative"]],
-                      "two.sided" = gettextf("The alternative hypothesis is that the population correlation differs from %s.", format(testValue)),
+                      "two.sided" = gettextf("The alternative hypothesis is that the population correlation is not equal to %s.", format(testValue)),
                       "greater"   = gettextf("The alternative hypothesis is that the population correlation is greater than %s.", format(testValue)),
                       "less"      = gettextf("The alternative hypothesis is that the population correlation is less than %s.", format(testValue)))
   outputTable$addFootnote(hypLabel)
@@ -184,6 +186,67 @@ oneCorrelation <- function(jaspResults, dataset, options, ...) {
     row$vsmpr <- vsmpr
 
   return(row)
+}
+
+# ---- scatter plot (shared with twoCorrelations) ---------------------------
+
+# Options that change the scatter plot itself, as opposed to the variables it displays.
+.correlationScatterPlotDeps <- c("scatterPlot", "scatterPlotDensity", "scatterPlotRegressionLine",
+                                 "scatterPlotRegressionLineCi", "scatterPlotRegressionLineCiLevel")
+
+.oneCorrelationScatterPlot <- function(jaspResults, dataset, options, ready) {
+  if (!options[["scatterPlot"]] || !is.null(jaspResults[["scatterPlot"]]))
+    return()
+
+  scatterPlot <- createJaspPlot(title = gettext("Scatter Plot"), width = 500, height = 500)
+  scatterPlot$position <- 2
+  # deliberately not depending on the coefficients: the plot does not change with them
+  scatterPlot$dependOn(c("firstVariable", "secondVariable", .correlationScatterPlotDeps))
+  jaspResults[["scatterPlot"]] <- scatterPlot
+
+  if (!ready)
+    return()
+
+  plotObject <- .correlationScatterPlotObject(dataset, options,
+                                              options[["firstVariable"]],
+                                              options[["secondVariable"]])
+  if (isTryError(plotObject)) {
+    scatterPlot$setError(.extractErrorMessage(plotObject))
+    return()
+  }
+
+  scatterPlot$plotObject <- plotObject
+
+  return()
+}
+
+# Scatter plot used by oneCorrelation and twoCorrelations. Column names are passed through
+# unchanged; Desktop decodes them in the rendered plot (same as .boxplotMV).
+# forceLinearSmooth because these analyses test a linear (or rank) association: a loess line
+# would contradict the reported coefficient.
+.correlationScatterPlotObject <- function(dataset, options, xVar, yVar, groupVar = NULL) {
+  vars     <- c(xVar, yVar, groupVar)
+  plotDat  <- na.omit(dataset[, vars, drop = FALSE])
+  group    <- if (!is.null(groupVar)) as.factor(plotDat[[groupVar]]) else NULL
+  marginal <- if (options[["scatterPlotDensity"]]) "density" else "none"
+
+  p <- try(jaspGraphs::JASPScatterPlot(
+    x                 = plotDat[[xVar]],
+    y                 = plotDat[[yVar]],
+    group             = group,
+    xName             = xVar,
+    yName             = yVar,
+    addSmooth         = options[["scatterPlotRegressionLine"]],
+    addSmoothCI       = options[["scatterPlotRegressionLineCi"]],
+    smoothCIValue     = options[["scatterPlotRegressionLineCiLevel"]],
+    forceLinearSmooth = TRUE,
+    plotAbove         = marginal,
+    plotRight         = marginal,
+    showLegend        = !is.null(group),
+    legendTitle       = groupVar
+  ))
+
+  return(p)
 }
 
 # Fisher's z normal-approximation confidence interval for a Pearson correlation.

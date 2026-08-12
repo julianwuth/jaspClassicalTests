@@ -16,9 +16,12 @@
 #
 
 #' @import jaspBase
-#' @importFrom stats bartlett.test var.test shapiro.test na.omit pchisq pf pnorm qchisq sd uniroot var ave lm anova median
+#' @importFrom stats bartlett.test var.test shapiro.test na.omit pchisq pf pnorm qnorm sd uniroot var ave lm anova median
 #' @export
 multipleVariances <- function(jaspResults, dataset, options, ...) {
+  # makes the bootstrap confidence interval reproducible when the user sets a seed
+  jaspBase::.setSeedJASP(options)
+
   isRaw <- options[["inputType"]] == "rawData"
 
   # is ready if test is selected and data was provided
@@ -40,6 +43,13 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
               any(c(options[["fTest"]], options[["bartlettTest"]])))
   }
 
+  .pruneDisabledOutputMV(jaspResults, options)
+
+  # draw the (random) per-group intervals once, before anything consumes them
+  if (ready && ((options[["descriptives"]] && (options[["varianceCi"]] || options[["sdCi"]])) ||
+                options[["varEstimatePlot"]]))
+    .varianceCiCacheMV(jaspResults, dataset, options)
+
   .createOutputTableMV(jaspResults, dataset, options, ready)
 
   if (options[["descriptives"]])
@@ -48,15 +58,40 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   if (options[["varianceRatioCi"]])
     .createVarianceRatioTableMV(jaspResults, dataset, options, ready)
 
-  # variance-ratio and variance-estimate plots work from summaries; box and raincloud need raw data
-  wantPlots <- options[["varRatioPlot"]] || options[["varEstimatePlot"]] ||
-               (isRaw && (options[["boxPlot"]] || options[["rainCloudPlot"]]))
-  if (wantPlots)
+  if (.wantSummaryPlotsMV(options))
     .createSummaryPlotContainerMV(jaspResults, dataset, options, ready)
 
   # assumption checks require raw data
   if (isRaw)
     .assumptionChecksMV(jaspResults, dataset, options, ready)
+
+  return()
+}
+
+# variance-ratio and variance-estimate plots work from summaries; box and raincloud need raw data
+.wantSummaryPlotsMV <- function(options) {
+  isRaw <- options[["inputType"]] == "rawData"
+
+  return(options[["varRatioPlot"]] || options[["varEstimatePlot"]] ||
+         (isRaw && (options[["boxPlot"]] || options[["rainCloudPlot"]])))
+}
+
+# Output that is merely skipped by its builder (raw-data-only plots after a switch to summarized
+# input, an assumption-check container with both boxes unticked) is not covered by $dependOn(),
+# so drop it explicitly.
+.pruneDisabledOutputMV <- function(jaspResults, options) {
+  isRaw <- options[["inputType"]] == "rawData"
+
+  if (!isRaw) {
+    .removeJaspElement(jaspResults[["summaryPlots"]], "boxPlot")
+    .removeJaspElement(jaspResults[["summaryPlots"]], "rainCloudPlot")
+  }
+
+  if (!.wantSummaryPlotsMV(options))
+    .removeJaspElement(jaspResults, "summaryPlots")
+
+  if (!isRaw || !(options[["normalityTest"]] || options[["qqPlot"]]))
+    .removeJaspElement(jaspResults, "assumptionChecks")
 
   return()
 }
@@ -93,13 +128,50 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 }
 
 # Bonett's method needs the raw values (kurtosis); fall back to the sufficient-statistic
-# methods (chi-square variance CI, F-test ratio CI) for summarized input.
-.ciMethodMV <- function(options) {
-  if (options[["inputType"]] == "rawData") options[["ciMethod"]] else "chiSquare"
-}
-
+# F-test interval for summarized input. The per-group variance CI uses .ciMethodVar().
 .ratioCiMethodMV <- function(options) {
   if (options[["inputType"]] == "rawData") options[["ratioCiMethod"]] else "fTest"
+}
+
+# Per (variable, group) variance CI, shared by the descriptives table and the variance estimate
+# plot so both show the same numbers (the bootstrap is random) and it is drawn only once.
+# Depends on everything that changes a bound, and on nothing that merely changes its display.
+.varianceCiCacheMV <- function(jaspResults, dataset, options) {
+  if (!is.null(jaspResults[["varianceCiCache"]]))
+    return(jaspResults[["varianceCiCache"]]$object)
+
+  cacheState <- createJaspState()
+  cacheState$dependOn(c("dependent", "factor", "inputType", "summarizedGroups",
+                        "ciMethod", "confLevel", "bootstrapSamples", "setSeed", "seed"))
+  jaspResults[["varianceCiCache"]] <- cacheState
+
+  cache <- list()
+  for (depName in .getDepNamesMV(options)) {
+    groupData <- .getGroupDataMV(dataset, options, depName)
+    for (lvl in levels(droplevels(groupData$group))) {
+      subY <- groupData$y[groupData$group == lvl]
+      cache[[.varianceCiKeyMV(depName, lvl)]] <-
+        if (length(subY) < 2) list(lower = NA_real_, upper = NA_real_, error = NULL)
+        else .varianceCi(subY, options)
+    }
+  }
+
+  cacheState$object <- cache
+
+  return(cache)
+}
+
+# "\r" cannot occur in an encoded column name or a group label, so it is a safe key separator.
+.varianceCiKeyMV <- function(depName, lvl) {
+  return(paste(depName, lvl, sep = "\r"))
+}
+
+.groupVarianceCiMV <- function(ciCache, depName, lvl) {
+  ci <- ciCache[[.varianceCiKeyMV(depName, lvl)]]
+  if (is.null(ci))
+    return(list(lower = NA_real_, upper = NA_real_, error = NULL))
+
+  return(ci)
 }
 
 .createOutputTableMV <- function(jaspResults, dataset, options, ready) {
@@ -406,7 +478,8 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     return()
 
   descTable <- createJaspTable(title = gettext("Descriptive Statistics"))
-  descTable$dependOn(c("dependent", "factor", "descriptives", "varianceCi", "confLevel", "ciMethod",
+  descTable$dependOn(c("dependent", "factor", "descriptives", "varianceCi", "sdCi", "confLevel",
+                       "ciMethod", "bootstrapSamples", "setSeed", "seed",
                        "inputType", "summarizedGroups"))
   descTable$position <- 2
   jaspResults[["descriptivesTable"]] <- descTable
@@ -419,7 +492,15 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   if (options[["inputType"]] == "rawData")
     descTable$addColumnInfo(name = "mean", title = gettext("Mean"),      type = "number")
 
+  # each interval sits next to the estimate it belongs to
   descTable$addColumnInfo(name = "sd",     title = gettext("SD"),        type = "number")
+
+  if (options[["sdCi"]]) {
+    sdOvertitle <- gettextf("%i%% Confidence Interval<br>Std. Deviation", options[["confLevel"]] * 100)
+    descTable$addColumnInfo(name = "sdLower", title = gettext("Lower"), type = "number", overtitle = sdOvertitle)
+    descTable$addColumnInfo(name = "sdUpper", title = gettext("Upper"), type = "number", overtitle = sdOvertitle)
+  }
+
   descTable$addColumnInfo(name = "varEst", title = gettext("Variance"),  type = "number")
 
   if (options[["varianceCi"]]) {
@@ -433,13 +514,16 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   if(!ready)
     return()
 
-  .fillDescriptivesTableMV(descTable, dataset, options)
+  .fillDescriptivesTableMV(descTable, jaspResults, dataset, options)
 
   return()
 }
 
-.fillDescriptivesTableMV <- function(descTable, dataset, options) {
-  rows <- list()
+.fillDescriptivesTableMV <- function(descTable, jaspResults, dataset, options) {
+  rows    <- list()
+  wantCi  <- options[["varianceCi"]] || options[["sdCi"]]
+  ciCache <- if (wantCi) .varianceCiCacheMV(jaspResults, dataset, options) else list()
+  minN    <- Inf
 
   for (depName in .getDepNamesMV(options)) {
     groupData <- .getGroupDataMV(dataset, options, depName)
@@ -448,13 +532,13 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     for (lvl in levels) {
       subY <- groupData$y[groupData$group == lvl]
 
-      n <- length(subY)
+      n    <- length(subY)
+      minN <- min(minN, n)
 
       if (n < 2) {
         meanEst <- NA
         sdEst   <- NA
         varEst  <- NA
-        ci      <- c(NA, NA)
       } else {
         meanEst <- mean(subY)
         varEst  <- var(subY)
@@ -463,10 +547,21 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 
       row <- list(var = depName, group = lvl, n = n, mean = meanEst, sd = sdEst, varEst = varEst)
 
-      if (options[["varianceCi"]]) {
-        ci <- .computeGroupVarianceCi(subY, varEst, options)
-        row$lower <- ci[1]
-        row$upper <- ci[2]
+      if (wantCi) {
+        # Both intervals come from the same cached draw, so the variance interval and the
+        # standard deviation interval can never disagree.
+        ci <- .groupVarianceCiMV(ciCache, depName, lvl)
+
+        if (options[["varianceCi"]]) {
+          row$lower <- ci$lower
+          row$upper <- ci$upper
+        }
+
+        if (options[["sdCi"]]) {
+          sdCi        <- .sdCiFromVarianceCi(ci)
+          row$sdLower <- sdCi$lower
+          row$sdUpper <- sdCi$upper
+        }
       }
 
       rows[[length(rows) + 1]] <- row
@@ -475,28 +570,10 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 
   descTable$addRows(rows)
 
+  if (wantCi)
+    .varianceCiFootnotesVar(descTable, options, minN = minN)
+
   return()
-}
-
-.computeGroupVarianceCi <- function(subY, varEst, options) {
-  if (.ciMethodMV(options) == "bonett") {
-    ciRes <- try(DescTools::VarCI(subY, method = "bonett", conf.level = options[["confLevel"]]), silent = TRUE)
-
-    # Degrade gracefully: a failed Bonett CI shows as empty cells rather than
-    # aborting the whole descriptives table (matches how other groups are handled).
-    if (isTryError(ciRes))
-      return(c(NA, NA))
-
-    return(c(ciRes["lwr.ci"], ciRes["upr.ci"]))
-  }
-
-  # Chi-square CI for a variance: (n-1)s^2 / X^2_{1-a/2} < sigma^2 < (n-1)s^2 / X^2_{a/2}.
-  # Verified identical to DescTools::VarCI(method = "classic").
-  df    <- length(subY) - 1
-  alpha <- 1 - options[["confLevel"]]
-  lower <- df * varEst / qchisq(1 - alpha/2, df)
-  upper <- df * varEst / qchisq(alpha/2, df)
-  return(c(lower, upper))
 }
 
 .createVarianceRatioTableMV <- function(jaspResults, dataset, options, ready) {
@@ -597,6 +674,10 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 
 # This could potentially become a common function across analyses
 .assumptionChecksMV <- function(jaspResults, dataset, options, ready) {
+  # never emit an empty titled container when neither check is requested
+  if (!options[["normalityTest"]] && !options[["qqPlot"]])
+    return()
+
   if (is.null(jaspResults[["assumptionChecks"]])) {
     assumptionContainer <- createJaspContainer(title = gettext("Assumption Checks"))
     assumptionContainer$dependOn(c("dependent", "factor"))
@@ -932,16 +1013,18 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     return()
 
   estContainer <- createJaspContainer(title = gettext("Variance Estimate Plot"))
-  estContainer$dependOn(c("varEstimatePlot", "confLevel", "ciMethod", "inputType", "summarizedGroups"))
+  estContainer$dependOn(c("varEstimatePlot", "confLevel", "ciMethod", "bootstrapSamples",
+                          "setSeed", "seed", "inputType", "summarizedGroups"))
   jaspResults[["summaryPlots"]][["varEstimatePlot"]] <- estContainer
 
   if (!ready)
     return()
 
-  # Bonett CI needs raw values; use the chi-square ("classic") CI for summarized input
-  ciMethod   <- if (identical(.ciMethodMV(options), "bonett")) "bonett" else "classic"
-  xLabel     <- gettextf("%i%% CI for \u03C3\u00B2", round(options[["confLevel"]] * 100))
-  yLabel     <- if (options[["inputType"]] == "rawData") options[["factor"]] else gettext("Group")
+  # the same cached intervals the descriptives table shows, so a bootstrap CI cannot disagree
+  # between the two outputs
+  ciCache <- .varianceCiCacheMV(jaspResults, dataset, options)
+  xLabel  <- gettextf("%i%% CI for \u03C3\u00B2", round(options[["confLevel"]] * 100))
+  yLabel  <- if (options[["inputType"]] == "rawData") options[["factor"]] else gettext("Group")
 
   for (depName in .getDepNamesMV(options)) {
     plotTitle    <- if (depName == "") gettext("Variance Estimate") else jaspBase::decodeColNames(depName)
@@ -963,16 +1046,16 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
       yg <- plotDat$y[plotDat$group == lvl]
       if (length(yg) < 2) next
 
-      ci <- try(DescTools::VarCI(yg, method = ciMethod, conf.level = options[["confLevel"]]), silent = TRUE)
-      if (isTryError(ci)) {
-        ciErr <- as.character(ci)
+      ci <- .groupVarianceCiMV(ciCache, depName, lvl)
+      if (!is.null(ci$error)) {
+        ciErr <- ci$error
         break
       }
       rowsList[[lvl]] <- data.frame(
         group    = lvl,
         estimate = var(yg),
-        lower    = unname(ci["lwr.ci"]),
-        upper    = unname(ci["upr.ci"])
+        lower    = ci$lower,
+        upper    = ci$upper
       )
     }
 

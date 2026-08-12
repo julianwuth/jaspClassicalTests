@@ -74,10 +74,10 @@ Form
 		AssignedVariablesList
 		{
 			name:           "time"
-			title:          qsTr("Sample size (optional)")
+			title:          qsTr("Interval (optional)")
 			singleVariable: true
 			allowedColumns: ["scale"]
-			info:           qsTr("Per-row observation sample size, time or exposure. If omitted, each row contributes one unit.")
+			info:           qsTr("Per-row interval, observation time or exposure. If omitted, each row contributes one unit.")
 		}
 	}
 
@@ -111,13 +111,13 @@ Form
 
 			DoubleField
 			{
-				name:         "groupOneSampleSize"
-				label:        qsTr("Sample size")
+				name:         "groupOneInterval"
+				label:        qsTr("Interval")
 				defaultValue: 1
 				min:          0
 				decimals:     4
 				inclusive:    JASP.MaxOnly
-				info:         qsTr("Total number of observations for group 1.")
+				info:         qsTr("Total interval for group 1.")
 			}
 		}
 
@@ -145,13 +145,13 @@ Form
 
 			DoubleField
 			{
-				name:         "groupTwoSampleSize"
-				label:        qsTr("Sample size")
+				name:         "groupTwoInterval"
+				label:        qsTr("Interval")
 				defaultValue: 1
 				min:          0
 				decimals:     4
 				inclusive:    JASP.MaxOnly
-				info:         qsTr("Total number of observations for group 2.")
+				info:         qsTr("Total interval for group 2.")
 			}
 		}
 	}

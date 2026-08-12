@@ -77,10 +77,10 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
     groups <- list(
       list(name   = if (nchar(n1) > 0) n1 else gettext("Group 1"),
            events = options[["groupOneOccurrences"]],
-           time   = options[["groupOneSampleSize"]]),
+           time   = options[["groupOneInterval"]]),
       list(name   = if (nchar(n2) > 0) n2 else gettext("Group 2"),
            events = options[["groupTwoOccurrences"]],
-           time   = options[["groupTwoSampleSize"]])
+           time   = options[["groupTwoInterval"]])
     )
   }
   groups[[1]]$rate <- groups[[1]]$events / groups[[1]]$time
@@ -96,8 +96,8 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
 
   descTable <- createJaspTable(title = gettext("Descriptive Statistics"))
   descTable$dependOn(c("inputType", "count", "group", "time",
-                       "groupOneName", "groupOneOccurrences", "groupOneSampleSize",
-                       "groupTwoName", "groupTwoOccurrences", "groupTwoSampleSize",
+                       "groupOneName", "groupOneOccurrences", "groupOneInterval",
+                       "groupTwoName", "groupTwoOccurrences", "groupTwoInterval",
                        "descriptives", "descriptiveCi", "descriptiveConfLevel"))
   descTable$position <- 1
   jaspResults[["descriptivesTable"]] <- descTable
@@ -154,7 +154,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   descTable$setData(do.call(rbind, rows))
 
   if (options[["descriptiveCi"]])
-    descTable$addFootnote(gettext("Confidence interval based on exact Poisson distribution."))
+    descTable$addFootnote(gettextf("Confidence interval for %s based on the exact Poisson distribution.", "λ"))
 
   return()
 }
@@ -167,8 +167,8 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
 
   outputTable <- createJaspTable(title = gettext("Two-Sample Poisson Rate Test"))
   outputTable$dependOn(c("inputType", "count", "group", "time",
-                         "groupOneName", "groupOneOccurrences", "groupOneSampleSize",
-                         "groupTwoName", "groupTwoOccurrences", "groupTwoSampleSize",
+                         "groupOneName", "groupOneOccurrences", "groupOneInterval",
+                         "groupTwoName", "groupTwoOccurrences", "groupTwoInterval",
                          "testTarget", "exactTest", "normalApprox", "pooledSe",
                          "testRatio", "testDifference",
                          "alternative", "confLevel", "ratioCi", "ciMethod"))
@@ -253,7 +253,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
     d0 <- options[["testDifference"]]
     outputTable$addFootnote(
       switch(options[["alternative"]],
-        "two.sided" = gettextf("H\u2080: Rate\u2081 \u2212 Rate\u2082 = %.4g.", d0),
+        "two.sided" = gettextf("H\u2081: Rate\u2081 \u2212 Rate\u2082 \u2260 %.4g.", d0),
         "greater"   = gettextf("H\u2081: Rate\u2081 \u2212 Rate\u2082 > %.4g.", d0),
         "less"      = gettextf("H\u2081: Rate\u2081 \u2212 Rate\u2082 < %.4g.", d0)
       )
@@ -268,7 +268,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
     r0 <- options[["testRatio"]]
     outputTable$addFootnote(
       switch(options[["alternative"]],
-        "two.sided" = gettextf("H\u2080: Rate\u2081/Rate\u2082 = %.4g.", r0),
+        "two.sided" = gettextf("H\u2081: Rate\u2081/Rate\u2082 \u2260 %.4g.", r0),
         "greater"   = gettextf("H\u2081: Rate\u2081/Rate\u2082 > %.4g.", r0),
         "less"      = gettextf("H\u2081: Rate\u2081/Rate\u2082 < %.4g.", r0)
       )
@@ -408,7 +408,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   d0 <- options[["testDifference"]]
 
   if (T1 <= 0 || T2 <= 0) {
-    outputTable$setError(gettext("Normal approximation requires positive sample sizes in both groups."))
+    outputTable$setError(gettext("Normal approximation requires a positive interval in both groups."))
     return(NULL)
   }
 

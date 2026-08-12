@@ -34,9 +34,17 @@ twoCorrelations <- function(jaspResults, dataset, options, ...) {
     .twoCorrelationsCheckErrors(dataset, options)
 
   .twoCorrelationsTable(jaspResults, dataset, options, ready)
+  .twoCorrelationsScatterPlots(jaspResults, dataset, options, ready)
 
   return()
 }
+
+# The variable/layout options that decide which correlations are compared.
+.twoCorrelationsVariableDeps <- c("samples", "dependentType",
+                                  "independentVariable1", "independentVariable2", "groupingVariable",
+                                  "commonVariable", "overlapVariable1", "overlapVariable2",
+                                  "nonoverlapVariable1", "nonoverlapVariable2",
+                                  "nonoverlapVariable3", "nonoverlapVariable4")
 
 .twoCorrelationsReady <- function(options) {
   if (options[["samples"]] == "independent")
@@ -79,11 +87,7 @@ twoCorrelations <- function(jaspResults, dataset, options, ...) {
     return()
 
   outputTable <- createJaspTable(title = gettext("Comparison of Two Correlations"))
-  outputTable$dependOn(c("samples", "dependentType",
-                         "independentVariable1", "independentVariable2", "groupingVariable",
-                         "commonVariable", "overlapVariable1", "overlapVariable2",
-                         "nonoverlapVariable1", "nonoverlapVariable2", "nonoverlapVariable3",
-                         "nonoverlapVariable4", "alternative", "ci", "ciLevel"))
+  outputTable$dependOn(c(.twoCorrelationsVariableDeps, "alternative", "ci", "ciLevel"))
   outputTable$position <- 1
   jaspResults[["outputTable"]] <- outputTable
 
@@ -126,6 +130,60 @@ twoCorrelations <- function(jaspResults, dataset, options, ...) {
   return()
 }
 
+# ---- Scatter plots --------------------------------------------------------
+
+# One plot per compared correlation, except for independent groups: there both correlations
+# involve the same pair of variables, so a single plot coloured by group shows the comparison
+# on one pair of axes.
+.twoCorrelationsScatterPlotSpecs <- function(options) {
+  if (options[["samples"]] == "independent")
+    return(list(list(x     = options[["independentVariable1"]],
+                     y     = options[["independentVariable2"]],
+                     group = options[["groupingVariable"]])))
+
+  if (options[["dependentType"]] == "overlapping")
+    return(list(list(x = options[["commonVariable"]], y = options[["overlapVariable1"]], group = NULL),
+                list(x = options[["commonVariable"]], y = options[["overlapVariable2"]], group = NULL)))
+
+  return(list(list(x = options[["nonoverlapVariable1"]], y = options[["nonoverlapVariable2"]], group = NULL),
+              list(x = options[["nonoverlapVariable3"]], y = options[["nonoverlapVariable4"]], group = NULL)))
+}
+
+.twoCorrelationsScatterPlots <- function(jaspResults, dataset, options, ready) {
+  if (!options[["scatterPlot"]] || !is.null(jaspResults[["scatterPlots"]]))
+    return()
+
+  scatterContainer <- createJaspContainer(title = gettext("Scatter Plots"))
+  scatterContainer$dependOn(c(.twoCorrelationsVariableDeps, .correlationScatterPlotDeps))
+  scatterContainer$position <- 2
+  jaspResults[["scatterPlots"]] <- scatterContainer
+
+  if (!ready)
+    return()
+
+  specs <- .twoCorrelationsScatterPlotSpecs(options)
+
+  for (i in seq_along(specs)) {
+    spec     <- specs[[i]]
+    tempPlot <- createJaspPlot(title  = gettextf("%1$s and %2$s",
+                                                 jaspBase::decodeColNames(spec$x),
+                                                 jaspBase::decodeColNames(spec$y)),
+                               width = 500, height = 500)
+    tempPlot$position <- i
+    scatterContainer[[paste0("scatterPlot", i)]] <- tempPlot
+
+    plotObject <- .correlationScatterPlotObject(dataset, options, spec$x, spec$y, spec$group)
+    if (isTryError(plotObject)) {
+      tempPlot$setError(.extractErrorMessage(plotObject))
+      next
+    }
+
+    tempPlot$plotObject <- plotObject
+  }
+
+  return()
+}
+
 # ---- Independent groups: Fisher (1925) z + Zou (2007) CI ------------------
 
 .twoCorrelationsIndependent <- function(dataset, options) {
@@ -154,9 +212,9 @@ twoCorrelations <- function(jaspResults, dataset, options, ...) {
   corLabel <- gettextf("Correlation (%1$s, %2$s)",
                        jaspBase::decodeColNames(v1), jaspBase::decodeColNames(v2))
   rows <- list(
-    .twoCorRow(gettextf("%1$s: group %2$s", corLabel, levels[1]), n1, r1,
+    .twoCorRow(gettextf("%1$s: Group %2$s", corLabel, levels[1]), n1, r1,
                .twoCorFisherCi(r1, n1, options), options),
-    .twoCorRow(gettextf("%1$s: group %2$s", corLabel, levels[2]), n2, r2,
+    .twoCorRow(gettextf("%1$s: Group %2$s", corLabel, levels[2]), n2, r2,
                .twoCorFisherCi(r2, n2, options), options),
     .twoCorDiffRow(r1 - r2, test$z, test$p, ci, options)
   )

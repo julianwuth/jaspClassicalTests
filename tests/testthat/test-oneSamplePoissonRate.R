@@ -6,7 +6,7 @@ test_that("Summarized data: exact + normal approximation with CI matches", {
   options <- .osprOptions()
   options$inputType           <- "summarized"
   options$observedOccurrences <- 12
-  options$sampleSize          <- 10
+  options$interval            <- 10
   options$testRate            <- 1
   options$exactTest           <- TRUE
   options$normalApprox        <- TRUE
@@ -25,7 +25,7 @@ test_that("Summarized data: one-sided alternative changes the p-value", {
   options <- .osprOptions()
   options$inputType           <- "summarized"
   options$observedOccurrences <- 12
-  options$sampleSize          <- 10
+  options$interval            <- 10
   options$testRate            <- 1
   options$alternative         <- "greater"
   results <- jaspTools::runAnalysis("oneSamplePoissonRate", "debug.csv", options)

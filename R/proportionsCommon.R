@@ -37,14 +37,33 @@
     return(NULL)
   factorCol <- as.factor(factorCol)
 
+  succCol <- dataset[[succName]]
+  sizeCol <- if (sizeName != "") dataset[[sizeName]] else NULL
+
+  # Trailing/blank spreadsheet rows arrive as NA in every assigned column. Drop rows with
+  # missing values in any assigned column before deciding individual vs aggregated input,
+  # otherwise the nlevels/length heuristic below misreads aggregated data as individual data.
+  # droplevels() afterwards: a level that only occurred in dropped rows would otherwise
+  # survive as an all-zero group.
+  cols <- list(factorCol, succCol)
+  if (!is.null(sizeCol))
+    cols <- c(cols, list(sizeCol))
+
+  keep     <- Reduce(`&`, lapply(cols, function(x) !is.na(x)))
+  nRemoved <- sum(!keep)
+
+  factorCol <- droplevels(factorCol[keep])
+  succCol   <- succCol[keep]
+  if (!is.null(sizeCol))
+    sizeCol <- sizeCol[keep]
+
   isIndividual <- nlevels(factorCol) != length(factorCol)
 
   if (isIndividual) {
     if (sizeName != "")
       .quitAnalysis(gettext("No sample size should be provided when the individual successes for each factor level are specified."))
 
-    succCol <- dataset[[succName]]
-    if (length(unique(stats::na.omit(succCol))) != 2)
+    if (length(unique(succCol)) != 2)
       .quitAnalysis(gettext("The successes variable must have exactly two levels when the sample size is not specified."))
 
     frequencies <- table(factorCol, succCol)
@@ -59,13 +78,32 @@
 
     data <- data.frame(
       level      = factor(as.character(factorCol), levels = levels(factorCol)),
-      successes  = dataset[[succName]],
-      sampleSize = dataset[[sizeName]]
+      successes  = succCol,
+      sampleSize = sizeCol
     )
-    data <- data[!is.na(data$level), , drop = FALSE]
   }
 
+  attr(data, "nRemoved") <- nRemoved
+
   return(data)
+}
+
+# Report rows excluded because one of the assigned columns was empty.
+.mpAddMissingFootnote <- function(table, data) {
+  nRemoved <- attr(data, "nRemoved")
+  if (is.null(nRemoved) || nRemoved == 0)
+    return()
+
+  table$addFootnote(gettextf(ngettext(nRemoved,
+                                      "%i row with missing values was removed.",
+                                      "%i rows with missing values were removed."),
+                             nRemoved))
+}
+
+# The descriptive confidence intervals are intervals for the proportion, so they are
+# only meaningful when the descriptives are displayed on the proportion scale.
+.mpShowsProportions <- function(options) {
+  return(options[["descriptivesDisplay"]] == "proportions")
 }
 
 .mpCheckErrors <- function(data, options) {
@@ -98,9 +136,12 @@
   descTable <- createJaspTable(title = gettext("Descriptives"))
   descTable$dependOn(c("factor", "successes", "sampleSize", "descriptivesTable",
                        "descriptivesDisplay", "descriptivesTableCi", "descriptivesTableCiLevel"))
-  # 3 (not 2) so it sits after the two-proportions effect-size table (position 2).
-  descTable$position <- 3
+  # Descriptives come first in both proportions analyses, before the test output.
+  descTable$position <- 1
   descTable$showSpecifiedColumnsOnly <- TRUE
+
+  # A disabled QML control still ships its stored value to R, so gate the CI here too.
+  withCi <- options[["descriptivesTableCi"]] && .mpShowsProportions(options)
 
   factorTitle <- if (options[["factor"]] == "") gettext("Factor") else options[["factor"]]
   descTable$addColumnInfo(name = "level", title = factorTitle, type = "string")
@@ -112,7 +153,7 @@
 
   descTable$addColumnInfo(name = "size", title = gettext("Sample size"), type = "integer")
 
-  if (options[["descriptivesTableCi"]]) {
+  if (withCi) {
     overtitle <- gettextf("%s%% Confidence Interval", 100 * options[["descriptivesTableCiLevel"]])
     descTable$addColumnInfo(name = "lowerCI", title = gettext("Lower"), type = "number", overtitle = overtitle)
     descTable$addColumnInfo(name = "upperCI", title = gettext("Upper"), type = "number", overtitle = overtitle)
@@ -125,10 +166,12 @@
 
   descTable$setData(.mpDescriptivesData(data, options,
                                         ciLevel = options[["descriptivesTableCiLevel"]],
-                                        withCI  = options[["descriptivesTableCi"]]))
+                                        withCI  = withCi))
 
-  if (options[["descriptivesTableCi"]])
-    descTable$addFootnote(gettext("Confidence intervals are based on independent binomial distributions (Clopper-Pearson)."))
+  if (withCi)
+    descTable$addFootnote(gettextf("Confidence intervals are for %s (the population proportion), based on independent binomial distributions (Clopper-Pearson).", "θ"))
+
+  .mpAddMissingFootnote(descTable, data)
 
   return()
 }
@@ -147,7 +190,7 @@
   )
 
   if (withCI) {
-    ci <- .mpBinomCI(data$successes, data$sampleSize, ciLevel, asCounts)
+    ci <- .mpBinomCI(data$successes, data$sampleSize, ciLevel)
     out$lowerCI <- ci$lower
     out$upperCI <- ci$upper
   }
@@ -155,16 +198,15 @@
   return(out)
 }
 
-# Per-group Clopper-Pearson CI, on the proportion scale or (scaled) count scale.
-.mpBinomCI <- function(successes, sampleSize, ciLevel, asCounts) {
+# Per-group Clopper-Pearson CI for the population proportion θ.
+.mpBinomCI <- function(successes, sampleSize, ciLevel) {
   lower <- upper <- numeric(length(successes))
   for (i in seq_along(successes)) {
     res <- try(stats::binom.test(successes[i], sampleSize[i], conf.level = ciLevel)$conf.int, silent = TRUE)
     if (isTryError(res))
       res <- c(NA, NA)
-    scale <- if (asCounts) sampleSize[i] else 1
-    lower[i] <- res[1] * scale
-    upper[i] <- res[2] * scale
+    lower[i] <- res[1]
+    upper[i] <- res[2]
   }
   return(data.frame(lower = lower, upper = upper))
 }
@@ -175,8 +217,8 @@
 
   descPlot <- createJaspPlot(title = gettext("Descriptives Plot"), width = 480, height = 320)
   descPlot$dependOn(c("factor", "successes", "sampleSize", "descriptivesPlot",
-                      "descriptivesDisplay", "descriptivesPlotCiLevel"))
-  descPlot$position <- 4
+                      "descriptivesDisplay", "descriptivesPlotCi", "descriptivesPlotCiLevel"))
+  descPlot$position <- 2
   jaspResults[["descriptivesPlot"]] <- descPlot
 
   if (!ready)
@@ -184,7 +226,7 @@
 
   plotData <- .mpDescriptivesData(data, options,
                                   ciLevel = options[["descriptivesPlotCiLevel"]],
-                                  withCI  = TRUE)
+                                  withCI  = options[["descriptivesPlotCi"]] && .mpShowsProportions(options))
 
   descPlot$plotObject <- .mpMakePlot(plotData, options)
 
@@ -198,13 +240,20 @@
   # reverse the levels because of the coord_flip below
   plotData$level <- factor(plotData$level, levels = rev(plotData$level))
 
+  hasCi <- all(c("lowerCI", "upperCI") %in% names(plotData))
+
   # y-axis margin: prefer the upper CI, fall back to the observed value
-  plotData$yMax <- ifelse(is.na(plotData$upperCI), plotData$observed, plotData$upperCI)
+  plotData$yMax <- if (hasCi) ifelse(is.na(plotData$upperCI), plotData$observed, plotData$upperCI)
+                   else       plotData$observed
   yBreaks <- jaspGraphs::getPrettyAxisBreaks(c(0, plotData$yMax))
 
   p <- ggplot2::ggplot(data = plotData, mapping = ggplot2::aes(x = level, y = observed)) +
-    ggplot2::geom_bar(stat = "identity", linewidth = 0.75, colour = "black", fill = "grey") +
-    ggplot2::geom_errorbar(ggplot2::aes(ymin = lowerCI, ymax = upperCI), linewidth = 0.75, width = 0.3) +
+    ggplot2::geom_bar(stat = "identity", linewidth = 0.75, colour = "black", fill = "grey")
+
+  if (hasCi)
+    p <- p + ggplot2::geom_errorbar(ggplot2::aes(ymin = lowerCI, ymax = upperCI), linewidth = 0.75, width = 0.3)
+
+  p <- p +
     ggplot2::xlab(if (options[["factor"]] == "") gettext("Factor") else options[["factor"]]) +
     ggplot2::scale_y_continuous(name = yName, breaks = yBreaks) +
     ggplot2::coord_flip() +

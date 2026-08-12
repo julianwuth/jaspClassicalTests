@@ -87,6 +87,63 @@ test_that("Descriptives table with Bonett CI matches", {
   ))
 })
 
+test_that("Bootstrap CI is shared by the descriptives table and the variance estimate plot", {
+  options <- .mvOptions()
+  options$dependent       <- "contNormal"
+  options$factor          <- "facGender"
+  options$leveneTest      <- TRUE
+  options$descriptives    <- TRUE
+  options$varianceCi      <- TRUE
+  options$sdCi            <- TRUE
+  options$varEstimatePlot <- TRUE
+  options$ciMethod        <- "bootstrap"
+  options$setSeed         <- TRUE
+  options$seed            <- 1
+  results <- jaspTools::runAnalysis("multipleVariances", "debug.csv", options)
+  skip_if(results$status == "fatalError", "jaspGraphs/ggplot2 version incompatibility")
+
+  table    <- results[["results"]][["descriptivesTable"]][["data"]]
+  plotName <- results[["results"]][["summaryPlots"]][["collection"]][["summaryPlots_varEstimatePlot"]][["collection"]][["summaryPlots_varEstimatePlot_contNormal"]][["data"]]
+  plotData <- results[["state"]][["figures"]][[plotName]][["obj"]][["data"]]
+
+  tableCol <- function(name) vapply(table, function(row) row[[name]], numeric(1))
+
+  # the bootstrap is random, so both outputs must come from the same cached draw
+  expect_equal(tableCol("lower"), plotData$lower)
+  expect_equal(tableCol("upper"), plotData$upper)
+
+  # and the SD interval is exactly the square root of the variance interval
+  expect_equal(tableCol("sdLower"), sqrt(tableCol("lower")))
+  expect_equal(tableCol("sdUpper"), sqrt(tableCol("upper")))
+
+  notes <- vapply(results[["results"]][["descriptivesTable"]][["footnotes"]], function(x) x$text, character(1))
+  expect_true(any(grepl("BCa bootstrap intervals based on 1000 replicates", notes)))
+})
+
+test_that("Summarized input falls back to the chi-square interval", {
+  summarizedOptions <- function(method) {
+    options <- .mvOptions()
+    options$inputType        <- "summarized"
+    options$summarizedGroups <- list(list(groupName = "A", variance = 4.2, n = 30),
+                                     list(groupName = "B", variance = 6.1, n = 28))
+    options$bartlettTest     <- TRUE
+    options$descriptives     <- TRUE
+    options$varianceCi       <- TRUE
+    options$sdCi             <- TRUE
+    options$ciMethod         <- method
+    return(options)
+  }
+
+  bootstrapResults <- jaspTools::runAnalysis("multipleVariances", data.frame(dummy = rnorm(3)), summarizedOptions("bootstrap"))
+  chiResults       <- jaspTools::runAnalysis("multipleVariances", data.frame(dummy = rnorm(3)), summarizedOptions("chiSquare"))
+
+  expect_equal(bootstrapResults[["results"]][["descriptivesTable"]][["data"]],
+               chiResults[["results"]][["descriptivesTable"]][["data"]])
+
+  notes <- vapply(bootstrapResults[["results"]][["descriptivesTable"]][["footnotes"]], function(x) x$text, character(1))
+  expect_true(any(grepl("require the raw observations", notes)))
+})
+
 test_that("Variance ratio table (2 groups) matches", {
   options <- .mvOptions()
   options$dependent       <- "contNormal"

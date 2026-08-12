@@ -68,7 +68,7 @@ Form
 			title:          qsTr("Interval (optional)")
 			singleVariable: true
 			allowedColumns: ["scale"]
-			info:           qsTr("A variable containing the sample size, observation time or exposure for each row. If omitted, each row is assumed to contribute one unit of time.")
+			info:           qsTr("A variable containing the interval, observation time or exposure for each row. If omitted, each row is assumed to contribute one unit of time.")
 		}
 	}
 
@@ -89,13 +89,13 @@ Form
 
 		DoubleField
 		{
-			name:         "sampleSize"
-			label:        qsTr("Sample size")
+			name:         "interval"
+			label:        qsTr("Interval")
 			defaultValue: 1
 			min:          0
 			decimals:     4
 			inclusive:    JASP.MaxOnly
-			info:         qsTr("Total number of observations.")
+			info:         qsTr("Total interval (observation time or exposure).")
 		}
 	}
 

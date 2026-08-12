@@ -108,11 +108,12 @@ Form
 	{
 		name: "alternative"
 		title: qsTr("Alternative Hypothesis")
-		RadioButton 
-        { 
-            value: "two.sided" // to fit the input pattern of the underlying R package		
-            label: qsTr("≠ Test value"); 
-            info: qsTr("Two sided alternative hypothesis that the sample variance is not equal to the test value. Selected by default."); checked: true	
+		// the values fit the input pattern of the underlying R package
+		RadioButton
+        {
+            value: "two.sided"
+            label: qsTr("≠ Test value");
+            info: qsTr("Two sided alternative hypothesis that the sample variance is not equal to the test value. Selected by default."); checked: true
         }
 		RadioButton 
         { 
@@ -129,41 +130,59 @@ Form
 	}
 
     Group
-	{
-		title: qsTr("Additional Statistics")
+    {
+        title: qsTr("Additional Statistics")
 
         CheckBox
         {
             label: qsTr("Sample variance")
-            name: "varEstimate"
+            name:  "varEstimate"
 
-            CheckBox
-            {
-                name: "varianceCi"
-                label: qsTr("Confidence interval")
-                id: varianceCi
-                childrenOnSameRow: true
-                CIField { name: "confLevel" }
-            }
-
-            RadioButtonGroup
-            {
-                name: "ciMethod"
-                title: qsTr("Method")
-                enabled: varianceCi.checked && inputRawData.checked
-                radioButtonsOnSameRow: true
-                info: qsTr("Method for the confidence interval. Bonett's method needs the raw observations (it relies on the sample kurtosis), so with summarized data only the χ² interval is available and the method cannot be changed.")
-                RadioButton { value: "chiSquare"; label: qsTr("χ²") ; checked: true }
-                RadioButton { value: "bonett"; label: qsTr("Bonett") }
-            }
+            CheckBox { name: "varianceCi"; label: qsTr("Confidence interval"); id: varianceCi; info: qsTr("Confidence interval for the population variance.") }
         }
 
         CheckBox
         {
             label: qsTr("Standard deviation")
-            name: "sdEstimate"
+            name:  "sdEstimate"
+
+            CheckBox { name: "sdCi"; label: qsTr("Confidence interval"); id: sdCi; info: qsTr("Confidence interval for the population standard deviation. It is the square root of the variance interval, which preserves the coverage exactly.") }
         }
-        
+
+        Group
+        {
+            title:   qsTr("Confidence Interval")
+            enabled: varianceCi.checked || sdCi.checked
+
+            CIField { name: "confLevel"; label: qsTr("Interval") }
+
+            RadioButtonGroup
+            {
+                id:                    ciMethod
+                name:                  "ciMethod"
+                title:                 qsTr("Method")
+                enabled:               inputRawData.checked
+                radioButtonsOnSameRow: true
+                info:                  qsTr("Method for the confidence interval. Bonett's method and the bootstrap need the raw observations, so with summarized data only the χ² interval is available and the method cannot be changed.")
+
+                RadioButton { value: "chiSquare"; label: qsTr("χ²"); checked: true }
+                RadioButton { value: "bonett";    label: qsTr("Bonett") }
+                RadioButton { value: "bootstrap"; label: qsTr("Bootstrap") }
+            }
+
+            IntegerField
+            {
+                name:         "bootstrapSamples"
+                label:        qsTr("Bootstrap samples")
+                defaultValue: 1000
+                min:          100
+                fieldWidth:   60
+                enabled:      inputRawData.checked && ciMethod.value === "bootstrap"
+                info:         qsTr("Number of bootstrap replicates for the BCa interval.")
+            }
+
+            SetSeed { enabled: inputRawData.checked && ciMethod.value === "bootstrap" }
+        }
     }
 
     Group

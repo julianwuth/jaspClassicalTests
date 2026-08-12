@@ -54,7 +54,7 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
     }
   } else {
     events <- options[["observedOccurrences"]]
-    time   <- options[["sampleSize"]]
+    time   <- options[["interval"]]
   }
   return(list(events = events, time = time))
 }
@@ -64,7 +64,7 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
     return()
 
   outputTable <- createJaspTable(title = gettext("One-Sample Poisson Rate Test"))
-  outputTable$dependOn(c("inputType", "count", "time", "observedOccurrences", "sampleSize",
+  outputTable$dependOn(c("inputType", "count", "time", "observedOccurrences", "interval",
                          "exactTest", "normalApprox", "testRate", "alternative",
                          "confLevel", "rateCi"))
   jaspResults[["outputTable"]] <- outputTable
@@ -137,6 +137,9 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
       "less"      = gettextf("Alternative hypothesis: Rate < %.4g.", rate0)
     )
   )
+
+  if (options[["rateCi"]])
+    outputTable$addFootnote(gettextf("Confidence intervals are for %s; the exact row uses the exact Poisson distribution, the normal-approximation row a normal approximation.", "λ"))
 
   return()
 }

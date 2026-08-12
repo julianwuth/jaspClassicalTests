@@ -120,31 +120,14 @@ Form
     {
         title: qsTr("Additional Statistics")
 
-        CheckBox 
-        { 
-            name: "descriptives" 
+        CheckBox
+        {
+            name: "descriptives"
             label: qsTr("Descriptives")
-            id: descriptives 
-            
-            CheckBox
-            {
-                name: "varianceCi"
-                label: qsTr("Confidence interval")
-                id: varianceCi
-                childrenOnSameRow: true
-                CIField { name: "confLevel" }
-            }
+            id: descriptives
 
-            RadioButtonGroup
-            {
-                name: "ciMethod"
-                title: qsTr("Method")
-                enabled: varianceCi.checked && inputRawData.checked
-                radioButtonsOnSameRow: true
-                info: qsTr("Method for the per-group variance confidence interval. Bonett's method needs the raw observations (it relies on the sample kurtosis), so with summarized data only the χ² interval is available and the method cannot be changed.")
-                RadioButton { value: "chiSquare"; label: qsTr("χ²"); checked: true }
-                RadioButton { value: "bonett"; label: qsTr("Bonett") }
-            }
+            CheckBox { name: "varianceCi"; label: qsTr("Confidence interval for the variance"); id: varianceCi; info: qsTr("Confidence interval for the population variance of each group.") }
+            CheckBox { name: "sdCi"; label: qsTr("Confidence interval for the standard deviation"); id: sdCi; info: qsTr("Confidence interval for the population standard deviation of each group. It is the square root of the variance interval, which preserves the coverage exactly.") }
         }
 
         CheckBox
@@ -164,6 +147,41 @@ Form
                 RadioButton { value: "fTest"; label: qsTr("F-test"); checked: true }
                 RadioButton { value: "bonett"; label: qsTr("Bonett") }
             }
+        }
+
+        Group
+        {
+            title: qsTr("Confidence Interval")
+            info:  qsTr("Shared settings for every confidence interval in this analysis: the descriptives table, the variance ratio and both interval plots.")
+
+            CIField { name: "confLevel"; label: qsTr("Interval") }
+
+            RadioButtonGroup
+            {
+                id:                    ciMethod
+                name:                  "ciMethod"
+                title:                 qsTr("Method")
+                enabled:               inputRawData.checked
+                radioButtonsOnSameRow: true
+                info:                  qsTr("Method for the per-group variance confidence interval. Bonett's method and the bootstrap need the raw observations, so with summarized data only the χ² interval is available and the method cannot be changed.")
+
+                RadioButton { value: "chiSquare"; label: qsTr("χ²"); checked: true }
+                RadioButton { value: "bonett";    label: qsTr("Bonett") }
+                RadioButton { value: "bootstrap"; label: qsTr("Bootstrap") }
+            }
+
+            IntegerField
+            {
+                name:         "bootstrapSamples"
+                label:        qsTr("Bootstrap samples")
+                defaultValue: 1000
+                min:          100
+                fieldWidth:   60
+                enabled:      inputRawData.checked && ciMethod.value === "bootstrap"
+                info:         qsTr("Number of bootstrap replicates for the BCa interval.")
+            }
+
+            SetSeed { enabled: inputRawData.checked && ciMethod.value === "bootstrap" }
         }
     }
 

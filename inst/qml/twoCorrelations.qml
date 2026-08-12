@@ -49,7 +49,7 @@ Form
 		AvailableVariablesList { name: "allVariablesListIndep" }
 		AssignedVariablesList { name: "independentVariable1"; title: qsTr("First Variable");  allowedColumns: ["scale"];  singleVariable: true; info: qsTr("First variable of the correlation.") }
 		AssignedVariablesList { name: "independentVariable2"; title: qsTr("Second Variable"); allowedColumns: ["scale"];  singleVariable: true; info: qsTr("Second variable of the correlation.") }
-		AssignedVariablesList { name: "groupingVariable";     title: qsTr("Grouping Variable"); allowedColumns: ["nominal", "nominalText", "ordinal"]; singleVariable: true; info: qsTr("Factor with exactly two levels defining the two independent groups.") }
+		AssignedVariablesList { name: "groupingVariable";     title: qsTr("Grouping Variable"); allowedColumns: ["nominal"]; minLevels: 2; maxLevels: 2; singleVariable: true; info: qsTr("Nominal variable with exactly two levels defining the two independent groups.") }
 	}
 
 	VariablesForm
@@ -77,9 +77,9 @@ Form
 	{
 		name:  "alternative"
 		title: qsTr("Alternative Hypothesis")
-		RadioButton { value: "two.sided"; label: qsTr("Correlations differ"); checked: true; info: qsTr("Two-sided alternative hypothesis that the two population correlations differ.") }
-		RadioButton { value: "greater";   label: qsTr("First > Second"); info: qsTr("One-sided alternative hypothesis that the first population correlation is greater than the second.") }
-		RadioButton { value: "less";      label: qsTr("First < Second"); info: qsTr("One-sided alternative hypothesis that the first population correlation is less than the second.") }
+		RadioButton { value: "two.sided"; label: qsTr("Correlation 1 ≠ Correlation 2"); checked: true; info: qsTr("Two-sided alternative hypothesis that the first population correlation is not equal to the second.") }
+		RadioButton { value: "greater";   label: qsTr("Correlation 1 > Correlation 2"); info: qsTr("One-sided alternative hypothesis that the first population correlation is greater than the second.") }
+		RadioButton { value: "less";      label: qsTr("Correlation 1 < Correlation 2"); info: qsTr("One-sided alternative hypothesis that the first population correlation is less than the second.") }
 	}
 
 	Group
@@ -92,6 +92,37 @@ Form
 			info:  qsTr("Confidence intervals for the individual Pearson correlations (Fisher's z) and for their difference (Zou, 2007).")
 			childrenOnSameRow: true
 			CIField { name: "ciLevel" }
+		}
+	}
+
+	Group
+	{
+		title: qsTr("Plots")
+
+		CheckBox
+		{
+			name:    "scatterPlot"
+			label:   qsTr("Scatter plot")
+			checked: true
+			info:    qsTr("Scatter plot of the correlated variables. Independent groups are shown in one plot, coloured by group; dependent correlations get one plot each.")
+
+			CheckBox { name: "scatterPlotDensity"; label: qsTr("Densities for variables"); checked: true; info: qsTr("Adds marginal densities above and to the right of the scatter plot.") }
+
+			CheckBox
+			{
+				name:    "scatterPlotRegressionLine"
+				label:   qsTr("Regression line")
+				checked: true
+				info:    qsTr("Adds a linear regression line.")
+
+				CheckBox
+				{
+					name:              "scatterPlotRegressionLineCi"
+					label:             qsTr("Confidence interval")
+					childrenOnSameRow: true
+					CIField { name: "scatterPlotRegressionLineCiLevel" }
+				}
+			}
 		}
 	}
 }

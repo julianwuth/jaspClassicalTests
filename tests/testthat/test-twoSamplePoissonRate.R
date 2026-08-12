@@ -6,9 +6,9 @@ test_that("Summarized data: difference with both tests, CI, and descriptives mat
   options <- .tsprOptions()
   options$inputType            <- "summarized"
   options$groupOneOccurrences  <- 15
-  options$groupOneSampleSize   <- 10
+  options$groupOneInterval     <- 10
   options$groupTwoOccurrences  <- 8
-  options$groupTwoSampleSize   <- 10
+  options$groupTwoInterval     <- 10
   options$testTarget           <- "difference"
   options$testDifference       <- 0
   options$exactTest            <- TRUE
@@ -39,9 +39,9 @@ test_that("Summarized data: ratio target matches", {
   options <- .tsprOptions()
   options$inputType            <- "summarized"
   options$groupOneOccurrences  <- 15
-  options$groupOneSampleSize   <- 10
+  options$groupOneInterval     <- 10
   options$groupTwoOccurrences  <- 8
-  options$groupTwoSampleSize   <- 10
+  options$groupTwoInterval     <- 10
   options$testTarget           <- "ratio"
   options$testRatio            <- 1
   options$exactTest            <- TRUE
@@ -62,9 +62,9 @@ test_that("Summarized data: normal-approx ratio uses the Wald log rate-ratio CI"
   options <- .tsprOptions()
   options$inputType           <- "summarized"
   options$groupOneOccurrences <- 15
-  options$groupOneSampleSize  <- 10
+  options$groupOneInterval    <- 10
   options$groupTwoOccurrences <- 8
-  options$groupTwoSampleSize   <- 10
+  options$groupTwoInterval    <- 10
   options$testTarget          <- "ratio"
   options$testRatio           <- 1
   options$exactTest           <- FALSE

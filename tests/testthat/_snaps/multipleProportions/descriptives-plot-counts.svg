@@ -27,19 +27,10 @@
 </defs>
 <g clip-path='url(#cpNjAuOTh8NzIwLjAwfDIwLjcxfDUwNy4wOQ==)'>
 <rect x='60.98' y='20.71' width='659.02' height='486.39' style='stroke-width: 10.67; stroke: none;' />
-<rect x='90.93' y='43.51' width='266.36' height='136.80' style='stroke-width: 1.60; stroke-linecap: butt; stroke-linejoin: miter; fill: #BEBEBE;' />
-<rect x='90.93' y='195.50' width='399.54' height='136.80' style='stroke-width: 1.60; stroke-linecap: butt; stroke-linejoin: miter; fill: #BEBEBE;' />
-<rect x='90.93' y='347.50' width='532.72' height='136.80' style='stroke-width: 1.60; stroke-linecap: butt; stroke-linejoin: miter; fill: #BEBEBE;' />
-<polyline points='455.98,134.70 455.98,89.11 ' style='stroke-width: 1.60; stroke-linecap: butt;' />
-<polyline points='455.98,111.91 266.78,111.91 ' style='stroke-width: 1.60; stroke-linecap: butt;' />
-<polyline points='266.78,134.70 266.78,89.11 ' style='stroke-width: 1.60; stroke-linecap: butt;' />
-<polyline points='580.99,286.70 580.99,241.10 ' style='stroke-width: 1.60; stroke-linecap: butt;' />
-<polyline points='580.99,263.90 391.78,263.90 ' style='stroke-width: 1.60; stroke-linecap: butt;' />
-<polyline points='391.78,286.70 391.78,241.10 ' style='stroke-width: 1.60; stroke-linecap: butt;' />
-<polyline points='690.04,438.70 690.04,393.10 ' style='stroke-width: 1.60; stroke-linecap: butt;' />
-<polyline points='690.04,415.90 532.30,415.90 ' style='stroke-width: 1.60; stroke-linecap: butt;' />
-<polyline points='532.30,438.70 532.30,393.10 ' style='stroke-width: 1.60; stroke-linecap: butt;' />
-<line x1='90.61' y1='507.09' x2='623.97' y2='507.09' style='stroke-width: 0.64; stroke-linecap: butt;' />
+<rect x='90.93' y='43.51' width='299.56' height='136.80' style='stroke-width: 1.60; stroke-linecap: butt; stroke-linejoin: miter; fill: #BEBEBE;' />
+<rect x='90.93' y='195.50' width='449.33' height='136.80' style='stroke-width: 1.60; stroke-linecap: butt; stroke-linejoin: miter; fill: #BEBEBE;' />
+<rect x='90.93' y='347.50' width='599.11' height='136.80' style='stroke-width: 1.60; stroke-linecap: butt; stroke-linejoin: miter; fill: #BEBEBE;' />
+<line x1='90.61' y1='507.09' x2='690.36' y2='507.09' style='stroke-width: 0.64; stroke-linecap: butt;' />
 <rect x='60.98' y='20.71' width='659.02' height='486.39' style='stroke-width: 0.00; stroke: none;' />
 </g>
 <g clip-path='url(#cpMC4wMHw3MjAuMDB8MC4wMHw1NzYuMDA=)'>
@@ -52,15 +43,15 @@
 <polyline points='52.47,111.91 60.98,111.91 ' style='stroke-width: 0.64; stroke-linecap: butt;' />
 <polyline points='60.98,507.09 720.00,507.09 ' style='stroke-width: 0.00; stroke: none; stroke-linecap: butt;' />
 <polyline points='90.93,515.60 90.93,507.09 ' style='stroke-width: 0.64; stroke-linecap: butt;' />
-<polyline points='224.11,515.60 224.11,507.09 ' style='stroke-width: 0.64; stroke-linecap: butt;' />
-<polyline points='357.29,515.60 357.29,507.09 ' style='stroke-width: 0.64; stroke-linecap: butt;' />
-<polyline points='490.47,515.60 490.47,507.09 ' style='stroke-width: 0.64; stroke-linecap: butt;' />
-<polyline points='623.66,515.60 623.66,507.09 ' style='stroke-width: 0.64; stroke-linecap: butt;' />
+<polyline points='240.71,515.60 240.71,507.09 ' style='stroke-width: 0.64; stroke-linecap: butt;' />
+<polyline points='390.49,515.60 390.49,507.09 ' style='stroke-width: 0.64; stroke-linecap: butt;' />
+<polyline points='540.27,515.60 540.27,507.09 ' style='stroke-width: 0.64; stroke-linecap: butt;' />
+<polyline points='690.04,515.60 690.04,507.09 ' style='stroke-width: 0.64; stroke-linecap: butt;' />
 <text x='90.93' y='534.27' text-anchor='middle' style='font-size: 17.00px; font-family: sans;' textLength='9.46px' lengthAdjust='spacingAndGlyphs'>0</text>
-<text x='224.11' y='534.27' text-anchor='middle' style='font-size: 17.00px; font-family: sans;' textLength='18.91px' lengthAdjust='spacingAndGlyphs'>10</text>
-<text x='357.29' y='534.27' text-anchor='middle' style='font-size: 17.00px; font-family: sans;' textLength='18.91px' lengthAdjust='spacingAndGlyphs'>20</text>
-<text x='490.47' y='534.27' text-anchor='middle' style='font-size: 17.00px; font-family: sans;' textLength='18.91px' lengthAdjust='spacingAndGlyphs'>30</text>
-<text x='623.66' y='534.27' text-anchor='middle' style='font-size: 17.00px; font-family: sans;' textLength='18.91px' lengthAdjust='spacingAndGlyphs'>40</text>
+<text x='240.71' y='534.27' text-anchor='middle' style='font-size: 17.00px; font-family: sans;' textLength='18.91px' lengthAdjust='spacingAndGlyphs'>10</text>
+<text x='390.49' y='534.27' text-anchor='middle' style='font-size: 17.00px; font-family: sans;' textLength='18.91px' lengthAdjust='spacingAndGlyphs'>20</text>
+<text x='540.27' y='534.27' text-anchor='middle' style='font-size: 17.00px; font-family: sans;' textLength='18.91px' lengthAdjust='spacingAndGlyphs'>30</text>
+<text x='690.04' y='534.27' text-anchor='middle' style='font-size: 17.00px; font-family: sans;' textLength='18.91px' lengthAdjust='spacingAndGlyphs'>40</text>
 <text x='390.49' y='566.78' text-anchor='middle' style='font-size: 20.40px; font-family: sans;' textLength='154.26px' lengthAdjust='spacingAndGlyphs'>Observed counts</text>
 <text transform='translate(19.02,263.90) rotate(-90)' text-anchor='middle' style='font-size: 20.40px; font-family: sans;' textLength='29.49px' lengthAdjust='spacingAndGlyphs'>grp</text>
 <text x='390.49' y='11.70' text-anchor='middle' style='font-size: 17.00px; font-family: sans;' textLength='178.61px' lengthAdjust='spacingAndGlyphs'>descriptives-plot-counts</text>

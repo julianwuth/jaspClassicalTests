@@ -5,6 +5,7 @@ options$secondVariable <- "contcor2"
 options$ci             <- TRUE
 options$effectSize     <- TRUE
 options$vovkSellke     <- TRUE
+options$scatterPlot    <- FALSE # the scatter plot has its own test below
 set.seed(1)
 results <- runAnalysis("oneCorrelation", "debug.csv", options)
 
@@ -23,6 +24,7 @@ test_that("One Correlation test-value (0.3, greater) results match", {
   options$secondVariable <- "contcor2"
   options$testValue      <- 0.3
   options$alternative    <- "greater"
+  options$scatterPlot    <- FALSE
   set.seed(1)
   results <- runAnalysis("oneCorrelation", "debug.csv", options)
   table <- results[["results"]][["outputTable"]][["data"]]
@@ -36,9 +38,52 @@ test_that("One Correlation throws error on infinity", {
   dat <- data.frame(a = c(rnorm(10), Inf), b = rnorm(11))
   options$firstVariable  <- "a"
   options$secondVariable <- "b"
+  options$scatterPlot    <- FALSE
   set.seed(1)
   results <- runAnalysis("oneCorrelation", dat, options)
   expect_identical(results[["status"]], "validationError")
+})
+
+########## scatter plot (on by default) ##########
+test_that("One Correlation scatter plot with marginal densities matches", {
+  options <- analysisOptions("oneCorrelation")
+  options$firstVariable  <- "contcor1"
+  options$secondVariable <- "contcor2"
+  set.seed(1)
+  results <- runAnalysis("oneCorrelation", "debug.csv", options)
+  skip_if(results$status == "fatalError", "jaspGraphs/ggplot2 version incompatibility")
+
+  plotName <- results[["results"]][["scatterPlot"]][["data"]]
+  testPlot <- results[["state"]][["figures"]][[plotName]][["obj"]]
+  jaspTools::expect_equal_plots(testPlot, "scatter-plot")
+})
+
+test_that("One Correlation scatter plot without densities matches", {
+  options <- analysisOptions("oneCorrelation")
+  options$firstVariable                <- "contcor1"
+  options$secondVariable               <- "contcor2"
+  options$scatterPlotDensity           <- FALSE
+  options$scatterPlotRegressionLineCi  <- TRUE
+  set.seed(1)
+  results <- runAnalysis("oneCorrelation", "debug.csv", options)
+  skip_if(results$status == "fatalError", "jaspGraphs/ggplot2 version incompatibility")
+
+  plotName <- results[["results"]][["scatterPlot"]][["data"]]
+  testPlot <- results[["state"]][["figures"]][[plotName]][["obj"]]
+  jaspTools::expect_equal_plots(testPlot, "scatter-plot-no-density")
+})
+
+test_that("Scatter plot is shown without a selected coefficient", {
+  options <- analysisOptions("oneCorrelation")
+  options$firstVariable  <- "contcor1"
+  options$secondVariable <- "contcor2"
+  options$pearson        <- FALSE
+  set.seed(1)
+  results <- runAnalysis("oneCorrelation", "debug.csv", options)
+  skip_if(results$status == "fatalError", "jaspGraphs/ggplot2 version incompatibility")
+
+  expect_false(is.null(results[["results"]][["scatterPlot"]][["data"]]))
+  expect_length(results[["results"]][["outputTable"]][["data"]], 0)
 })
 
 ########## Fisher-z CI matches jaspRegression exactly ##########
