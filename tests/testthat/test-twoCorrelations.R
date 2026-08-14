@@ -12,9 +12,9 @@ results <- runAnalysis("twoCorrelations", "debug.csv", options)
 test_that("Two Correlations independent table matches (validated vs cocor)", {
   table <- results[["results"]][["outputTable"]][["data"]]
   jaspTools::expect_equal_tables(table,
-    list(0.655439006126101, 0.461239866741707, 50, "", "Correlation (contcor1, contcor2): group f",
+    list(0.655439006126101, 0.461239866741707, 50, "", "Correlation (contcor1, contcor2): Group f",
          0.789711750760164, "", 0.661989783974437, 0.470301369433625, 50, "",
-         "Correlation (contcor1, contcor2): group m", 0.794027363620302, "",
+         "Correlation (contcor1, contcor2): Group m", 0.794027363620302, "",
          -0.00655077784833602, -0.241385247584739, "", 0.955263634734093,
          "Difference", 0.227486864894737, -0.0560981286245177))
 })
