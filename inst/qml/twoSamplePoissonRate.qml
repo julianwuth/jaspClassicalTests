@@ -74,10 +74,10 @@ Form
 		AssignedVariablesList
 		{
 			name:           "time"
-			title:          qsTr("Sample size (optional)")
+			title:          qsTr("Interval (optional)")
 			singleVariable: true
 			allowedColumns: ["scale"]
-			info:           qsTr("Per-row observation sample size, time or exposure. If omitted, each row contributes one unit.")
+			info:           qsTr("Per-row interval, observation time or exposure. If omitted, each row contributes one unit.")
 		}
 	}
 
@@ -111,13 +111,13 @@ Form
 
 			DoubleField
 			{
-				name:         "groupOneSampleSize"
-				label:        qsTr("Sample size")
+				name:         "groupOneInterval"
+				label:        qsTr("Interval")
 				defaultValue: 1
 				min:          0
 				decimals:     4
 				inclusive:    JASP.MaxOnly
-				info:         qsTr("Total number of observations for group 1.")
+				info:         qsTr("Total interval for group 1.")
 			}
 		}
 
@@ -145,40 +145,74 @@ Form
 
 			DoubleField
 			{
-				name:         "groupTwoSampleSize"
-				label:        qsTr("Sample size")
+				name:         "groupTwoInterval"
+				label:        qsTr("Interval")
 				defaultValue: 1
 				min:          0
 				decimals:     4
 				inclusive:    JASP.MaxOnly
-				info:         qsTr("Total number of observations for group 2.")
+				info:         qsTr("Total interval for group 2.")
 			}
 		}
 	}
+    
+    Group 
+    {
+        title: qsTr("Test Target")
 
-	RadioButtonGroup
-	{
-		name:    "testTarget"
-		title:   qsTr("Test Target")
-		columns: 2
+        RadioButtonGroup
+        {
+            name:    "testTarget"
+            columns: 2
 
-		RadioButton
-		{
-			value: "ratio"
-			label: qsTr("Ratio")
-			id:    targetRatio
-			info:  qsTr("Test the ratio of the two rates.")
-		}
+            RadioButton
+            {
+                value: "ratio"
+                label: qsTr("Ratio")
+                id:    targetRatio
+                info:  qsTr("Test the ratio of the two rates.")
+            }
 
-		RadioButton
-		{
-			value:   "difference"
-			label:   qsTr("Difference")
-			checked: true
-			id:      targetDifference
-			info:    qsTr("Test the difference between the two rates.")
-		}
-	}
+            RadioButton
+            {
+                value:   "difference"
+                label:   qsTr("Difference")
+                checked: true
+                id:      targetDifference
+                info:    qsTr("Test the difference between the two rates.")
+            }
+                        
+        }
+
+        Group
+        {
+            CheckBox
+            {
+                name:              "ratioCi"
+                label:             qsTr("Confidence interval")
+                id:                ratioCi
+                childrenOnSameRow: true
+                info:              qsTr("Confidence interval for the effect (ratio or difference). For the ratio, an exact interval (based on the conditional binomial) or a normal-approximation interval on the log scale is available. For the difference, the exact test reports a MOVER interval that combines the exact single-rate Poisson intervals (Zou & Donner, 2008), while the normal approximation reports an unpooled Wald interval.")
+
+                CIField { name: "confLevel" }
+                
+            }
+
+            RadioButtonGroup
+            {
+                name:                  "ciMethod"
+                title:                 qsTr("Method")
+                enabled:               ratioCi.checked
+                radioButtonsOnSameRow: true
+                indent:                true
+
+                RadioButton { value: "exact";  label: qsTr("Exact");               checked: true }
+                RadioButton { value: "normal"; label: qsTr("Normal approximation") }
+            }
+        }
+    
+    }
+	
 
 	Group
 	{
@@ -205,7 +239,7 @@ Form
 				label:   qsTr("Pooled standard error")
 				checked: true
 				visible: targetDifference.checked
-				info:    qsTr("Use the pooled rate estimate for the z statistic. Only relevant when testing the difference.")
+				info:    qsTr("Use the pooled rate estimate for the z statistic. Only relevant when testing the difference. This affects the test statistic and p-value only: The confidence interval is always based on the unpooled standard error, because the pooled estimate is valid only under the null hypothesis. The pooled estimate assumes a hypothesized difference of 0; with a nonzero hypothesized difference, select the unpooled standard error.")
 			}
 		}
 	}
@@ -281,29 +315,6 @@ Form
 
 				CIField { name: "descriptiveConfLevel" }
 			}
-		}
-
-		CheckBox
-		{
-			name:              "ratioCi"
-			label:             qsTr("Confidence interval")
-			id:                ratioCi
-			childrenOnSameRow: true
-			info:              qsTr("Confidence interval for the effect (ratio or difference).")
-
-			CIField { name: "confLevel" }
-		}
-
-		RadioButtonGroup
-		{
-			name:                  "ciMethod"
-			title:                 qsTr("Method")
-			enabled:               ratioCi.checked
-			visible:               targetRatio.checked
-			radioButtonsOnSameRow: true
-
-			RadioButton { value: "exact";  label: qsTr("Exact");               checked: true }
-			RadioButton { value: "normal"; label: qsTr("Normal approximation") }
 		}
 	}
 }

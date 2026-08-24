@@ -1,12 +1,13 @@
-Package: jaspHypothesisTests
+Package: jaspClassicalTests
 Type: Package
-Title: A JASP module for testing hypotheses.
+Title: A JASP module for classical tests.
 Version: 0.1.0
-Date: 2020-10-15
-Author: JASP Team
+Date: 2026-08-08
+Authors@R:
+    person("JASP Team", role = c("aut", "cre"), email = "info@jasp-stats.org")
 Website: jasp-stats.org
 Maintainer: JASP Team <info@jasp-stats.org>
-Description: Module that bundles all analyses commonly used for testing hypotheses.
+Description: Module that bundles classical statistical tests.
 License: GPL (>= 2)
 Encoding: UTF-8
 Imports:
@@ -16,10 +17,12 @@ Imports:
     jaspGraphs,
     jaspTTests
 Suggests:
-  testthat
+    jaspRegression (>= 0.96.5),
+    testthat
 Remotes: 
     jasp-stats/jaspBase,
     jasp-stats/jaspGraphs,
     jasp-stats/jaspTTests,
-    jasp-stats/jaspFrequencies
-RoxygenNote: 7.3.3
+    jasp-stats/jaspFrequencies,
+    jasp-stats/jaspRegression
+Config/roxygen2/version: 8.1.0

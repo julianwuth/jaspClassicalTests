@@ -16,22 +16,39 @@
 #
 
 #' @import jaspBase
-#' @importFrom stats bartlett.test var.test shapiro.test na.omit pchisq pf pnorm qchisq residuals aov sd uniroot var
-#' @importFrom car leveneTest
+#' @importFrom stats bartlett.test var.test shapiro.test na.omit pchisq pf pnorm qnorm sd uniroot var ave lm anova median
 #' @export
 multipleVariances <- function(jaspResults, dataset, options, ...) {
-  # is ready if test is selected and data was provided
-  ready <- (length(options[["dependent"]]) > 0 && options[["factor"]] != "")
+  # makes the bootstrap confidence interval reproducible when the user sets a seed
+  jaspBase::.setSeedJASP(options)
 
-  if (ready)
-    # TODO check if this should also check for exactly 2 levels of the factor
-    .hasErrors(dataset, type = c('infinity', 'variance', 'factorLevels'),
-               infinity.target = options[["dependent"]],
-               variance.target = options[["dependent"]],
-               variance.equalTo = 0,
-               factorLevels.target = options[["factor"]],
-               factorLevels.amount = '< 2',
-               exitAnalysisIfErrors = TRUE)
+  isRaw <- options[["inputType"]] == "rawData"
+
+  # is ready if test is selected and data was provided
+  if (isRaw) {
+    ready <- (length(options[["dependent"]]) > 0 && options[["factor"]] != "")
+    if (ready)
+      # At least 2 levels are required. Exactly 2 is NOT required: Bartlett's, Levene's
+      # and Bonett's tests support k > 2 groups; the F-test and variance ratio (2-group
+      # only) fall back to a footnote when there are more than 2 levels.
+      .hasErrors(dataset, type = c('infinity', 'variance', 'factorLevels'),
+                 infinity.target = options[["dependent"]],
+                 variance.target = options[["dependent"]],
+                 variance.equalTo = 0,
+                 factorLevels.target = options[["factor"]],
+                 factorLevels.amount = '< 2',
+                 exitAnalysisIfErrors = TRUE)
+  } else {
+    ready <- (length(options[["summarizedGroups"]]) >= 2 &&
+              any(c(options[["fTest"]], options[["bartlettTest"]])))
+  }
+
+  .pruneDisabledOutputMV(jaspResults, options)
+
+  # draw the (random) per-group intervals once, before anything consumes them
+  if (ready && ((options[["descriptives"]] && (options[["varianceCi"]] || options[["sdCi"]])) ||
+                options[["varEstimatePlot"]]))
+    .varianceCiCacheMV(jaspResults, dataset, options)
 
   .createOutputTableMV(jaspResults, dataset, options, ready)
 
@@ -41,12 +58,120 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   if (options[["varianceRatioCi"]])
     .createVarianceRatioTableMV(jaspResults, dataset, options, ready)
 
-  if (any(c(options[["boxPlot"]], options[["varRatioPlot"]], options[["varEstimatePlot"]])))
+  if (.wantSummaryPlotsMV(options))
     .createSummaryPlotContainerMV(jaspResults, dataset, options, ready)
 
-  .assumptionChecksMV(jaspResults, dataset, options, ready)
+  # assumption checks require raw data
+  if (isRaw)
+    .assumptionChecksMV(jaspResults, dataset, options, ready)
 
   return()
+}
+
+# variance-ratio and variance-estimate plots work from summaries; box and raincloud need raw data
+.wantSummaryPlotsMV <- function(options) {
+  isRaw <- options[["inputType"]] == "rawData"
+
+  return(options[["varRatioPlot"]] || options[["varEstimatePlot"]] ||
+         (isRaw && (options[["boxPlot"]] || options[["rainCloudPlot"]])))
+}
+
+# Output that is merely skipped by its builder (raw-data-only plots after a switch to summarized
+# input, an assumption-check container with both boxes unticked) is not covered by $dependOn(),
+# so drop it explicitly.
+.pruneDisabledOutputMV <- function(jaspResults, options) {
+  isRaw <- options[["inputType"]] == "rawData"
+
+  if (!isRaw) {
+    .removeJaspElement(jaspResults[["summaryPlots"]], "boxPlot")
+    .removeJaspElement(jaspResults[["summaryPlots"]], "rainCloudPlot")
+  }
+
+  if (!.wantSummaryPlotsMV(options))
+    .removeJaspElement(jaspResults, "summaryPlots")
+
+  if (!isRaw || !(options[["normalityTest"]] || options[["qqPlot"]]))
+    .removeJaspElement(jaspResults, "assumptionChecks")
+
+  return()
+}
+
+# The "variables" to loop over: the assigned columns for raw data, or a single
+# synthetic variable (blank label) for summarized input.
+.getDepNamesMV <- function(options) {
+  if (options[["inputType"]] == "rawData")
+    return(options[["dependent"]])
+  return("")
+}
+
+# Returns an na.omit'd data.frame(y, group) for one "variable".
+# Raw data:   the actual column paired with the grouping factor.
+# Summarized: synthetic per-group samples with the exact entered variance and size, so the
+#             same var.test / bartlett.test code path yields results identical to real data
+#             (both tests depend only on the per-group variance and sample size).
+.getGroupDataMV <- function(dataset, options, depName) {
+  if (options[["inputType"]] == "rawData") {
+    factor <- as.factor(dataset[[options[["factor"]]]])
+    return(na.omit(data.frame(y = dataset[[depName]], group = factor)))
+  }
+
+  groups <- options[["summarizedGroups"]]
+  ys     <- vector("list", length(groups))
+  labs   <- character(0)
+  for (i in seq_along(groups)) {
+    g   <- groups[[i]]
+    lab <- if (is.null(g[["groupName"]]) || g[["groupName"]] == "") as.character(i) else g[["groupName"]]
+    ys[[i]] <- .syntheticSampleSV(g[["n"]], g[["variance"]])
+    labs    <- c(labs, rep(lab, g[["n"]]))
+  }
+  data.frame(y = unlist(ys), group = factor(labs, levels = unique(labs)))
+}
+
+# Bonett's method needs the raw values (kurtosis); fall back to the sufficient-statistic
+# F-test interval for summarized input. The per-group variance CI uses .ciMethodVar().
+.ratioCiMethodMV <- function(options) {
+  if (options[["inputType"]] == "rawData") options[["ratioCiMethod"]] else "fTest"
+}
+
+# Per (variable, group) variance CI, shared by the descriptives table and the variance estimate
+# plot so both show the same numbers (the bootstrap is random) and it is drawn only once.
+# Depends on everything that changes a bound, and on nothing that merely changes its display.
+.varianceCiCacheMV <- function(jaspResults, dataset, options) {
+  if (!is.null(jaspResults[["varianceCiCache"]]))
+    return(jaspResults[["varianceCiCache"]]$object)
+
+  cacheState <- createJaspState()
+  cacheState$dependOn(c("dependent", "factor", "inputType", "summarizedGroups",
+                        "ciMethod", "confLevel", "bootstrapSamples", "setSeed", "seed"))
+  jaspResults[["varianceCiCache"]] <- cacheState
+
+  cache <- list()
+  for (depName in .getDepNamesMV(options)) {
+    groupData <- .getGroupDataMV(dataset, options, depName)
+    for (lvl in levels(droplevels(groupData$group))) {
+      subY <- groupData$y[groupData$group == lvl]
+      cache[[.varianceCiKeyMV(depName, lvl)]] <-
+        if (length(subY) < 2) list(lower = NA_real_, upper = NA_real_, error = NULL)
+        else .varianceCi(subY, options)
+    }
+  }
+
+  cacheState$object <- cache
+
+  return(cache)
+}
+
+# "\r" cannot occur in an encoded column name or a group label, so it is a safe key separator.
+.varianceCiKeyMV <- function(depName, lvl) {
+  return(paste(depName, lvl, sep = "\r"))
+}
+
+.groupVarianceCiMV <- function(ciCache, depName, lvl) {
+  ci <- ciCache[[.varianceCiKeyMV(depName, lvl)]]
+  if (is.null(ci))
+    return(list(lower = NA_real_, upper = NA_real_, error = NULL))
+
+  return(ci)
 }
 
 .createOutputTableMV <- function(jaspResults, dataset, options, ready) {
@@ -54,13 +179,14 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     return()
 
   outputTable <- createJaspTable(title = gettext("Test for Equality of Variances"))
-  outputTable$dependOn(c("dependent", "factor", "fTest", "leveneTest", "bonettTest", "bartlettTest"))
+  outputTable$dependOn(c("dependent", "factor", "fTest", "leveneTest", "bonettTest", "bartlettTest",
+                         "inputType", "summarizedGroups"))
   outputTable$position <- 1
   jaspResults[["outputTable"]] <- outputTable
 
   outputTable$addColumnInfo(name = "var",   title = gettext("Variable"),  type = "string")
   outputTable$addColumnInfo(name = "test",  title = gettext("Test"),      type = "string")
-  outputTable$addColumnInfo(name = "stat",  title = gettext("Statistic"), type = "number")
+  outputTable$addColumnInfo(name = "stat",  title = gettext("Statistic"), type = "number", format = "dp:3")
   outputTable$addColumnInfo(name = "df1",   title = gettext("df1"),       type = "integer")
   outputTable$addColumnInfo(name = "df2",   title = gettext("df2"),       type = "integer")
   outputTable$addColumnInfo(name = "p",     title = gettext("p"),         type = "pvalue")
@@ -76,20 +202,13 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 }
 
 .fillOutputTableMV <- function(outputTable, dataset, options) {
-  factorName <- options[["factor"]]
-  factor <- as.factor(dataset[[factorName]])
-  levels <- levels(factor)
-  nLevels <- length(levels)
+  isRaw <- options[["inputType"]] == "rawData"
 
   rows <- list()
   fTestFootnoteAdded <- FALSE
 
-  for (depName in options[["dependent"]]) {
-    y <- dataset[[depName]]
-
-    # Data cleaning
-    subData <- data.frame(y = y, group = factor)
-    subData <- na.omit(subData)
+  for (depName in .getDepNamesMV(options)) {
+    subData <- .getGroupDataMV(dataset, options, depName)
 
     if (nrow(subData) == 0) {
       outputTable$addFootnote(gettextf("%s has no observations after removing missing values.", depName),
@@ -97,14 +216,15 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
       next
     }
 
-    y <- subData$y
-    group <- subData$group
+    y       <- subData$y
+    group   <- droplevels(subData$group)
+    nLevels <- nlevels(group)
 
     # F-Test (only if 2 levels)
     if (options[["fTest"]] && nLevels == 2) {
       res <- try(var.test(y ~ group), silent = TRUE)
       if (isTryError(res)) {
-        outputTable$setError(gettext(as.character(res)))
+        outputTable$setError(.extractErrorMessage(res))
         return()
       }
       rows[[length(rows) + 1]] <- list(var = depName, test = gettext("F"),
@@ -114,34 +234,34 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
       fTestFootnoteAdded <- TRUE
     }
 
-    # Levene's Test
-    if (options[["leveneTest"]]) {
-      # TODO using the median technically means that this is the Brown-Forsythe test
-      res <- try(car::leveneTest(y ~ group, center = median), silent = TRUE)
+    # Levene's Test (requires raw data). Centered on the group median, i.e. the
+    # Brown-Forsythe variant, but displayed as "Levene's" for continuity.
+    if (isRaw && options[["leveneTest"]]) {
+      res <- try(.leveneTestMV(y, group), silent = TRUE)
       if (isTryError(res)) {
-        outputTable$setError(gettext(as.character(res)))
+        outputTable$setError(.extractErrorMessage(res))
         return()
       }
       rows[[length(rows) + 1]] <- list(var = depName, test = gettext("Levene's"),
-                                       stat = res$`F value`[1], df1 = res$Df[1], df2 = res$Df[2], p = res$`Pr(>F)`[1])
+                                       stat = res$statistic, df1 = res$df1, df2 = res$df2, p = res$p.value)
     }
 
     # Bartlett's Test
     if (options[["bartlettTest"]]) {
       res <- try(bartlett.test(y ~ group), silent = TRUE)
       if (isTryError(res)) {
-        outputTable$setError(gettext(as.character(res)))
+        outputTable$setError(.extractErrorMessage(res))
         return()
       }
       rows[[length(rows) + 1]] <- list(var = depName, test = gettext("Bartlett's"),
                                        stat = res$statistic, df1 = res$parameter[1], df2 = NA, p = res$p.value)
     }
 
-    # Bonett's Test
-    if (options[["bonettTest"]]) {
+    # Bonett's Test (requires raw data)
+    if (isRaw && options[["bonettTest"]]) {
       res <- try(.computeBonettTest(y, group, depName), silent = TRUE)
       if (isTryError(res)) {
-        outputTable$setError(gettext(as.character(res)))
+        outputTable$setError(.extractErrorMessage(res))
         return()
       }
       if (!is.null(res$error)) {
@@ -156,6 +276,21 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   outputTable$addRows(rows)
 
   return()
+}
+
+# Levene's test centered on the group median (the Brown-Forsythe variant):
+# a one-way ANOVA on the absolute deviations from each group's median.
+# Reproduces car::leveneTest(y ~ group, center = median) exactly (car itself
+# fits anova(lm(|y - median| ~ group))), so no car dependency is needed.
+.leveneTestMV <- function(y, group) {
+  group <- droplevels(as.factor(group))
+  meds  <- tapply(y, group, median)
+  resp  <- abs(y - meds[group])
+  tab   <- anova(lm(resp ~ group))
+  list(statistic = tab[["F value"]][1],
+       df1       = tab[["Df"]][1],
+       df2       = tab[["Df"]][2],
+       p.value   = tab[["Pr(>F)"]][1])
 }
 
 .computeBonettTest <- function(y, group, varName) {
@@ -343,15 +478,29 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     return()
 
   descTable <- createJaspTable(title = gettext("Descriptive Statistics"))
-  descTable$dependOn(c("dependent", "factor", "descriptives", "varianceCi", "confLevel", "ciMethod"))
+  descTable$dependOn(c("dependent", "factor", "descriptives", "varianceCi", "sdCi", "confLevel",
+                       "ciMethod", "bootstrapSamples", "setSeed", "seed",
+                       "inputType", "summarizedGroups"))
   descTable$position <- 2
   jaspResults[["descriptivesTable"]] <- descTable
 
   descTable$addColumnInfo(name = "var",    title = gettext("Variable"),  type = "string")
   descTable$addColumnInfo(name = "group",  title = gettext("Group"),     type = "string")
   descTable$addColumnInfo(name = "n",      title = gettext("N"),         type = "integer")
-  descTable$addColumnInfo(name = "mean",   title = gettext("Mean"),      type = "number")
+
+  # the mean is not available from summarized input
+  if (options[["inputType"]] == "rawData")
+    descTable$addColumnInfo(name = "mean", title = gettext("Mean"),      type = "number")
+
+  # each interval sits next to the estimate it belongs to
   descTable$addColumnInfo(name = "sd",     title = gettext("SD"),        type = "number")
+
+  if (options[["sdCi"]]) {
+    sdOvertitle <- gettextf("%i%% Confidence Interval<br>Std. Deviation", options[["confLevel"]] * 100)
+    descTable$addColumnInfo(name = "sdLower", title = gettext("Lower"), type = "number", overtitle = sdOvertitle)
+    descTable$addColumnInfo(name = "sdUpper", title = gettext("Upper"), type = "number", overtitle = sdOvertitle)
+  }
+
   descTable$addColumnInfo(name = "varEst", title = gettext("Variance"),  type = "number")
 
   if (options[["varianceCi"]]) {
@@ -365,32 +514,31 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   if(!ready)
     return()
 
-  .fillDescriptivesTableMV(descTable, dataset, options)
+  .fillDescriptivesTableMV(descTable, jaspResults, dataset, options)
 
   return()
 }
 
-.fillDescriptivesTableMV <- function(descTable, dataset, options) {
-  factorName <- options[["factor"]]
-  factor <- as.factor(dataset[[factorName]])
-  levels <- levels(factor)
+.fillDescriptivesTableMV <- function(descTable, jaspResults, dataset, options) {
+  rows    <- list()
+  wantCi  <- options[["varianceCi"]] || options[["sdCi"]]
+  ciCache <- if (wantCi) .varianceCiCacheMV(jaspResults, dataset, options) else list()
+  minN    <- Inf
 
-  rows <- list()
-
-  for (depName in options[["dependent"]]) {
-    y <- dataset[[depName]]
+  for (depName in .getDepNamesMV(options)) {
+    groupData <- .getGroupDataMV(dataset, options, depName)
+    levels    <- levels(droplevels(groupData$group))
 
     for (lvl in levels) {
-      subY <- y[factor == lvl & !is.na(factor)]
-      subY <- na.omit(subY)
+      subY <- groupData$y[groupData$group == lvl]
 
-      n <- length(subY)
+      n    <- length(subY)
+      minN <- min(minN, n)
 
       if (n < 2) {
         meanEst <- NA
         sdEst   <- NA
         varEst  <- NA
-        ci      <- c(NA, NA)
       } else {
         meanEst <- mean(subY)
         varEst  <- var(subY)
@@ -399,10 +547,21 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 
       row <- list(var = depName, group = lvl, n = n, mean = meanEst, sd = sdEst, varEst = varEst)
 
-      if (options[["varianceCi"]]) {
-        ci <- .computeGroupVarianceCi(subY, varEst, options)
-        row$lower <- ci[1]
-        row$upper <- ci[2]
+      if (wantCi) {
+        # Both intervals come from the same cached draw, so the variance interval and the
+        # standard deviation interval can never disagree.
+        ci <- .groupVarianceCiMV(ciCache, depName, lvl)
+
+        if (options[["varianceCi"]]) {
+          row$lower <- ci$lower
+          row$upper <- ci$upper
+        }
+
+        if (options[["sdCi"]]) {
+          sdCi        <- .sdCiFromVarianceCi(ci)
+          row$sdLower <- sdCi$lower
+          row$sdUpper <- sdCi$upper
+        }
       }
 
       rows[[length(rows) + 1]] <- row
@@ -411,27 +570,10 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 
   descTable$addRows(rows)
 
+  if (wantCi)
+    .varianceCiFootnotesVar(descTable, options, minN = minN)
+
   return()
-}
-
-.computeGroupVarianceCi <- function(subY, varEst, options) {
-  if (options[["ciMethod"]] == "bonett") {
-    ciRes <- try(DescTools::VarCI(subY, method = "bonett", conf.level = options[["confLevel"]]), silent = TRUE)
-
-    # TODO perhaps return an error message here
-    if (isTryError(ciRes))
-      return(c(NA, NA))
-
-    return(c(ciRes["lwr.ci"], ciRes["upr.ci"]))
-  }
-
-  # TODO check that these computations are correct
-  # Default: chi-square method
-  df    <- length(subY) - 1
-  alpha <- 1 - options[["confLevel"]]
-  lower <- df * varEst / qchisq(1 - alpha/2, df)
-  upper <- df * varEst / qchisq(alpha/2, df)
-  return(c(lower, upper))
 }
 
 .createVarianceRatioTableMV <- function(jaspResults, dataset, options, ready) {
@@ -439,7 +581,8 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     return()
 
   ratioTable <- createJaspTable(title = gettext("Variance Ratio"))
-  ratioTable$dependOn(c("dependent", "factor", "varianceRatioCi", "ratioCiMethod", "confLevel"))
+  ratioTable$dependOn(c("dependent", "factor", "varianceRatioCi", "ratioCiMethod", "confLevel",
+                        "inputType", "summarizedGroups"))
   ratioTable$position <- 3
   jaspResults[["varianceRatioTable"]] <- ratioTable
 
@@ -461,29 +604,25 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 }
 
 .fillVarianceRatioTableMV <- function(ratioTable, dataset, options) {
-  factorName <- options[["factor"]]
-  factor <- as.factor(dataset[[factorName]])
-  levels <- levels(factor)
-  nLevels <- length(levels)
-
-  if (nLevels != 2) {
-    ratioTable$addFootnote(gettext("Variance ratio confidence interval is only available for 2 groups."))
-    return()
-  }
-
   rows       <- list()
-  useBonett  <- identical(options[["ratioCiMethod"]], "bonett")
+  useBonett  <- identical(.ratioCiMethodMV(options), "bonett")
+  levels     <- NULL
 
-  for (depName in options[["dependent"]]) {
-    y <- dataset[[depName]]
-
-    subData <- data.frame(y = y, group = factor)
-    subData <- na.omit(subData)
+  for (depName in .getDepNamesMV(options)) {
+    subData <- .getGroupDataMV(dataset, options, depName)
 
     if (nrow(subData) == 0) {
       ratioTable$addFootnote(gettextf("%s has no observations after removing missing values.", depName),
                              symbol = gettext("<b>Warning:</b>"))
       next
+    }
+
+    subData$group <- droplevels(subData$group)
+    levels        <- levels(subData$group)
+
+    if (length(levels) != 2) {
+      ratioTable$addFootnote(gettext("Variance ratio confidence interval is only available for 2 groups."))
+      return()
     }
 
     y1 <- subData$y[subData$group == levels[1]]
@@ -518,6 +657,10 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   }
 
   ratioTable$addRows(rows)
+
+  if (is.null(levels))
+    return()
+
   ratioTable$addFootnote(gettextf("Variance ratio: Group %1$s / Group %2$s.", levels[1], levels[2]))
   ratioTable$addFootnote(
     if (useBonett)
@@ -531,6 +674,10 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 
 # This could potentially become a common function across analyses
 .assumptionChecksMV <- function(jaspResults, dataset, options, ready) {
+  # never emit an empty titled container when neither check is requested
+  if (!options[["normalityTest"]] && !options[["qqPlot"]])
+    return()
+
   if (is.null(jaspResults[["assumptionChecks"]])) {
     assumptionContainer <- createJaspContainer(title = gettext("Assumption Checks"))
     assumptionContainer$dependOn(c("dependent", "factor"))
@@ -555,11 +702,14 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   normalityTable$dependOn("normalityTest")
   jaspResults[["assumptionChecks"]][["normalityTest"]] <- normalityTable
 
-  normalityTable$addColumnInfo(name = "varName", title = gettext("Residuals"), type = "string")
-  normalityTable$addColumnInfo(name = "W",       title = gettext("W"),         type = "number")
-  normalityTable$addColumnInfo(name = "pValue",  title = gettext("p"),         type = "pvalue")
+  normalityTable$addColumnInfo(name = "varName", title = gettext("Variable"), type = "string", combine = TRUE)
+  normalityTable$addColumnInfo(name = "group",   title = gettext("Group"),    type = "string")
+  normalityTable$addColumnInfo(name = "W",       title = gettext("W"),        type = "number")
+  normalityTable$addColumnInfo(name = "pValue",  title = gettext("p"),        type = "pvalue")
 
-  normalityTable$addFootnote(gettext("Significant results suggest a deviation from normality."))
+  normalityTable$showSpecifiedColumnsOnly <- TRUE
+
+  normalityTable$addFootnote(gettext("Normality is tested within each group. Significant results suggest a deviation from normality."))
 
   if (ready)
     .fillNormalityTestTableMV(normalityTable, dataset, options)
@@ -570,28 +720,40 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 .fillNormalityTestTableMV <- function(normalityTable, dataset, options) {
 
   factor <- as.factor(dataset[[options[["factor"]]]])
+  levels <- levels(factor)
 
-  resList <- lapply(options[["dependent"]], function(depName) {
+  rows          <- list()
+  smallGroupHit <- FALSE
 
+  for (depName in options[["dependent"]]) {
     y <- dataset[[depName]]
-    # TODO check if this is the right way to get residuals and check them
-    model <- aov(y ~ factor)
-    resids <- residuals(model)
 
-    swTest <- try(shapiro.test(resids), silent = TRUE)
+    for (lvl in levels) {
+      subY <- na.omit(y[factor == lvl & !is.na(factor)])
+      n    <- length(subY)
 
-    if (isTryError(swTest)) {
-      normalityTable$setError(as.character(swTest))
-      return(NULL)
+      # Shapiro-Wilk requires between 3 and 5000 observations
+      if (n < 3) {
+        rows[[length(rows) + 1]] <- list(varName = depName, group = lvl, W = NA, pValue = NA)
+        smallGroupHit <- TRUE
+        next
+      }
+
+      swTest <- try(shapiro.test(subY), silent = TRUE)
+      if (isTryError(swTest)) {
+        normalityTable$setError(as.character(swTest))
+        return()
+      }
+
+      rows[[length(rows) + 1]] <- list(varName = depName, group = lvl,
+                                       W = as.numeric(swTest$statistic), pValue = as.numeric(swTest$p.value))
     }
+  }
 
-    data.frame(varName = depName, W = as.numeric(swTest$statistic), pValue = as.numeric(swTest$p.value), stringsAsFactors = FALSE)
-  })
+  normalityTable$addRows(rows)
 
-  results <- do.call(rbind, resList)
-
-  if (!is.null(results))
-    normalityTable$setData(results)
+  if (smallGroupHit)
+    normalityTable$addFootnote(gettext("Groups with fewer than 3 observations are omitted from the test."))
 
   return()
 }
@@ -610,18 +772,32 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   jaspResults[["assumptionChecks"]][["qqPlots"]] <- qqContainer
 
   factor <- as.factor(dataset[[options[["factor"]]]])
+  levels <- levels(factor)
 
   for (depName in options[["dependent"]]) {
-    y <- dataset[[depName]]
-    model <- aov(y ~ factor)
-    resids <- residuals(model)
-    stdResids <- scale(resids)
+    varContainer <- createJaspContainer(title = jaspBase::decodeColNames(depName))
+    qqContainer[[depName]] <- varContainer
 
-    tempPlot <- createJaspPlot(title = gettext(depName), height = 400, width = 500)
-    tempPlot$plotObject <- jaspGraphs::plotQQnorm(as.vector(stdResids),
-                                                  ciLevel = 0.95,
-                                                  yName = gettext("Standardized Residuals"))
-    qqContainer[[depName]] <- tempPlot
+    y <- dataset[[depName]]
+
+    for (lvl in levels) {
+      subY <- na.omit(y[factor == lvl & !is.na(factor)])
+
+      tempPlot <- createJaspPlot(title = lvl, height = 400, width = 500)
+      varContainer[[lvl]] <- tempPlot
+
+      # Standardize within the group so normality is assessed per group
+      if (length(subY) < 3 || sd(subY) == 0) {
+        tempPlot$setError(gettextf("Group %s has insufficient observations for a Q-Q plot.", lvl))
+        next
+      }
+
+      stdY <- as.vector(scale(subY))
+      tempPlot$plotObject <- jaspGraphs::plotQQnorm(stdY,
+                                                    ciLevel = 0.95,
+                                                    yName = gettext("Standardized Observations"),
+                                                    xName = gettext("Theoretical Quantiles"))
+    }
   }
 
   return()
@@ -635,7 +811,10 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     jaspResults[["summaryPlots"]] <- summaryPlots
   }
 
-  if (options[["boxPlot"]])
+  isRaw <- options[["inputType"]] == "rawData"
+
+  # box and raincloud plots require raw data
+  if (isRaw && options[["boxPlot"]])
     .boxplotMV(jaspResults, dataset, options, ready)
 
   if (options[["varRatioPlot"]])
@@ -643,6 +822,53 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 
   if (options[["varEstimatePlot"]])
     .varEstimatePlotMV(jaspResults, dataset, options, ready)
+
+  if (isRaw && options[["rainCloudPlot"]])
+    .rainCloudPlotMV(jaspResults, dataset, options, ready)
+
+  return()
+}
+
+.rainCloudPlotMV <- function(jaspResults, dataset, options, ready) {
+  if (!is.null(jaspResults[["summaryPlots"]][["rainCloudPlot"]]))
+    return()
+
+  rainContainer <- createJaspContainer(title = gettext("Raincloud Plot (Demeaned)"))
+  rainContainer$dependOn(c("rainCloudPlot", "rainCloudPlotHorizontal"))
+  jaspResults[["summaryPlots"]][["rainCloudPlot"]] <- rainContainer
+
+  if (!ready)
+    return()
+
+  factorName <- options[["factor"]]
+  factor     <- as.factor(dataset[[factorName]])
+  horiz      <- options[["rainCloudPlotHorizontal"]]
+
+  for (depName in options[["dependent"]]) {
+    tempPlot <- createJaspPlot(title = jaspBase::decodeColNames(depName), height = 320, width = 480)
+    rainContainer[[depName]] <- tempPlot
+
+    plotDat <- na.omit(data.frame(y = dataset[[depName]], group = factor))
+    if (nrow(plotDat) == 0) {
+      tempPlot$setError(gettextf("%s has no observations after removing missing values.", depName))
+      next
+    }
+
+    # Demean within each group: preserve variance, set every group mean to 0
+    plotDat$y <- ave(plotDat$y, plotDat$group, FUN = function(z) z - mean(z))
+
+    # Reuse the shared raincloud implementation from jaspTTests
+    names(plotDat) <- c(depName, factorName)
+    p <- try(jaspTTests:::.descriptivesPlotsRainCloudFill(plotDat, depName, factorName,
+                                                          yLabel = depName, xLabel = factorName,
+                                                          addLines = FALSE, horiz = horiz, testValue = NULL))
+    if (isTryError(p)) {
+      tempPlot$setError(as.character(p))
+      next
+    }
+
+    tempPlot$plotObject <- p
+  }
 
   return()
 }
@@ -662,8 +888,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
   factor     <- as.factor(dataset[[factorName]])
 
   for (depName in options[["dependent"]]) {
-    # TODO check if it is actually advised to wrap variable name titles into gettext
-    tempPlot <- createJaspPlot(title = gettext(depName), height = 350, width = 500)
+    tempPlot <- createJaspPlot(title = jaspBase::decodeColNames(depName), height = 350, width = 500)
     boxContainer[[depName]] <- tempPlot
 
     plotDat <- na.omit(data.frame(y = dataset[[depName]], group = factor))
@@ -699,14 +924,13 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     return()
 
   ratioContainer <- createJaspContainer(title = gettext("Variance Ratio Plot"))
-  ratioContainer$dependOn(c("varRatioPlot", "confLevel", "ratioCiMethod"))
+  ratioContainer$dependOn(c("varRatioPlot", "confLevel", "ratioCiMethod", "inputType", "summarizedGroups"))
   jaspResults[["summaryPlots"]][["varRatioPlot"]] <- ratioContainer
 
   if (!ready)
     return()
 
-  factor <- as.factor(dataset[[options[["factor"]]]])
-  levels <- levels(factor)
+  levels <- levels(droplevels(.getGroupDataMV(dataset, options, .getDepNamesMV(options)[1])$group))
 
   if (length(levels) != 2) {
     placeholder <- createJaspPlot(title = gettext("Variance Ratio"))
@@ -717,18 +941,21 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
 
   xLabel    <- gettextf("%i%% CI for \u03C3\u00B2(%s) / \u03C3\u00B2(%s)",
                         round(options[["confLevel"]] * 100), levels[1], levels[2])
-  useBonett <- identical(options[["ratioCiMethod"]], "bonett")
+  useBonett <- identical(.ratioCiMethodMV(options), "bonett")
   methodLab <- if (useBonett) gettext("Bonett") else gettext("F-test")
 
-  for (depName in options[["dependent"]]) {
-    tempPlot <- createJaspPlot(title = gettext(depName), height = 250, width = 500)
-    ratioContainer[[depName]] <- tempPlot
+  for (depName in .getDepNamesMV(options)) {
+    plotTitle    <- if (depName == "") gettext("Variance Ratio") else jaspBase::decodeColNames(depName)
+    containerKey <- if (depName == "") "summarized" else depName
+    tempPlot     <- createJaspPlot(title = plotTitle, height = 250, width = 500)
+    ratioContainer[[containerKey]] <- tempPlot
 
-    plotDat <- na.omit(data.frame(y = dataset[[depName]], group = factor))
+    plotDat <- .getGroupDataMV(dataset, options, depName)
     if (nrow(plotDat) == 0) {
       tempPlot$setError(gettextf("%s has no observations after removing missing values.", depName))
       next
     }
+    plotDat$group <- droplevels(plotDat$group)
 
     y1 <- plotDat$y[plotDat$group == levels[1]]
     y2 <- plotDat$y[plotDat$group == levels[2]]
@@ -786,27 +1013,32 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
     return()
 
   estContainer <- createJaspContainer(title = gettext("Variance Estimate Plot"))
-  estContainer$dependOn(c("varEstimatePlot", "confLevel", "ciMethod"))
+  estContainer$dependOn(c("varEstimatePlot", "confLevel", "ciMethod", "bootstrapSamples",
+                          "setSeed", "seed", "inputType", "summarizedGroups"))
   jaspResults[["summaryPlots"]][["varEstimatePlot"]] <- estContainer
 
   if (!ready)
     return()
 
-  factorName <- options[["factor"]]
-  factor     <- as.factor(dataset[[factorName]])
-  ciMethod   <- if (identical(options[["ciMethod"]], "bonett")) "bonett" else "classic"
-  xLabel     <- gettextf("%i%% CI for \u03C3\u00B2", round(options[["confLevel"]] * 100))
-  factorLvls <- levels(factor)
+  # the same cached intervals the descriptives table shows, so a bootstrap CI cannot disagree
+  # between the two outputs
+  ciCache <- .varianceCiCacheMV(jaspResults, dataset, options)
+  xLabel  <- gettextf("%i%% CI for \u03C3\u00B2", round(options[["confLevel"]] * 100))
+  yLabel  <- if (options[["inputType"]] == "rawData") options[["factor"]] else gettext("Group")
 
-  for (depName in options[["dependent"]]) {
-    tempPlot <- createJaspPlot(title = gettext(depName), height = 350, width = 500)
-    estContainer[[depName]] <- tempPlot
+  for (depName in .getDepNamesMV(options)) {
+    plotTitle    <- if (depName == "") gettext("Variance Estimate") else jaspBase::decodeColNames(depName)
+    containerKey <- if (depName == "") "summarized" else depName
+    tempPlot     <- createJaspPlot(title = plotTitle, height = 350, width = 500)
+    estContainer[[containerKey]] <- tempPlot
 
-    plotDat <- na.omit(data.frame(y = dataset[[depName]], group = factor))
+    plotDat <- .getGroupDataMV(dataset, options, depName)
     if (nrow(plotDat) == 0) {
       tempPlot$setError(gettextf("%s has no observations after removing missing values.", depName))
       next
     }
+    plotDat$group <- droplevels(plotDat$group)
+    factorLvls    <- levels(plotDat$group)
 
     rowsList <- list()
     ciErr <- NULL
@@ -814,16 +1046,16 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
       yg <- plotDat$y[plotDat$group == lvl]
       if (length(yg) < 2) next
 
-      ci <- try(DescTools::VarCI(yg, method = ciMethod, conf.level = options[["confLevel"]]), silent = TRUE)
-      if (isTryError(ci)) {
-        ciErr <- as.character(ci)
+      ci <- .groupVarianceCiMV(ciCache, depName, lvl)
+      if (!is.null(ci$error)) {
+        ciErr <- ci$error
         break
       }
       rowsList[[lvl]] <- data.frame(
         group    = lvl,
         estimate = var(yg),
-        lower    = unname(ci["lwr.ci"]),
-        upper    = unname(ci["upr.ci"])
+        lower    = ci$lower,
+        upper    = ci$upper
       )
     }
 
@@ -846,7 +1078,7 @@ multipleVariances <- function(jaspResults, dataset, options, ...) {
       ggplot2::geom_errorbarh(height = 0.2) +
       ggplot2::geom_point(size = 3) +
       ggplot2::scale_x_continuous(breaks = xBreaks, limits = xLims) +
-      ggplot2::labs(x = xLabel, y = factorName) +
+      ggplot2::labs(x = xLabel, y = yLabel) +
       jaspGraphs::geom_rangeframe(sides = "bl") +
       jaspGraphs::themeJaspRaw()
 

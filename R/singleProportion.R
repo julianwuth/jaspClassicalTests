@@ -16,12 +16,25 @@
 #
 
 #' @import jaspFrequencies
-#' @export 
+#' @export
 singleProportion <- function(jaspResults, dataset, options, ...) {
+  dataset <- .spDropMissingCounts(dataset, options)
   return(jaspFrequencies::BinomialTestInternal(jaspResults, dataset, options, ...))
 }
 
-#' @export
-multipleProportions <- function(jaspResults, dataset, options, ...) {
-  return(jaspFrequencies::MultinomialTestInternal(jaspResults, dataset, options, ...))
+# Blank cells below the last data row arrive as NA and make the count expansion inside
+# jaspFrequencies fail with "invalid 'times' argument"; drop those rows first.
+.spDropMissingCounts <- function(dataset, options) {
+  countsName <- options[["counts"]]
+  if (is.null(dataset) || countsName == "" || is.null(dataset[[countsName]]))
+    return(dataset)
+
+  keep <- !is.na(dataset[[countsName]])
+  if (all(keep))
+    return(dataset)
+
+  if (!any(keep))
+    .quitAnalysis(gettext("The counts variable contains no observed values."))
+
+  return(dataset[keep, , drop = FALSE])
 }

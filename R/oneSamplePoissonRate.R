@@ -43,7 +43,9 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
   if (options[["inputType"]] == "rawData") {
     countCol <- dataset[[options[["count"]]]]
     countCol <- stats::na.omit(countCol)
-    events   <- sum(countCol)
+    # poisson.test requires an integer event count; round the summed raw counts
+    # (consistent with the two-sample rate analysis).
+    events   <- as.integer(round(sum(countCol)))
     if (options[["time"]] != "") {
       timeCol <- dataset[[options[["time"]]]]
       time    <- sum(stats::na.omit(timeCol))
@@ -52,7 +54,7 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
     }
   } else {
     events <- options[["observedOccurrences"]]
-    time   <- options[["sampleSize"]]
+    time   <- options[["interval"]]
   }
   return(list(events = events, time = time))
 }
@@ -62,14 +64,14 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
     return()
 
   outputTable <- createJaspTable(title = gettext("One-Sample Poisson Rate Test"))
-  outputTable$dependOn(c("inputType", "count", "time", "observedOccurrences", "sampleSize",
+  outputTable$dependOn(c("inputType", "count", "time", "observedOccurrences", "interval",
                          "exactTest", "normalApprox", "testRate", "alternative",
                          "confLevel", "rateCi"))
   jaspResults[["outputTable"]] <- outputTable
 
   outputTable$addColumnInfo(name = "method",  title = gettext("Method"),      type = "string")
   outputTable$addColumnInfo(name = "events",  title = gettext("Occurrences"), type = "integer")
-  outputTable$addColumnInfo(name = "time",    title = gettext("N"),           type = "number")
+  outputTable$addColumnInfo(name = "time",    title = gettext("Interval"),           type = "number")
   outputTable$addColumnInfo(name = "rate",    title = gettext("Rate"),        type = "number")
 
   if (options[["normalApprox"]])
@@ -99,7 +101,7 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
 
   eventData <- try(.getEventDataPR(dataset, options), silent = TRUE)
   if (isTryError(eventData)) {
-    outputTable$setError(gettext(as.character(eventData)))
+    outputTable$setError(.extractErrorMessage(eventData))
     return()
   }
 
@@ -136,6 +138,9 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
     )
   )
 
+  if (options[["rateCi"]])
+    outputTable$addFootnote(gettextf("Confidence intervals are for %s; the exact row uses the exact Poisson distribution, the normal-approximation row a normal approximation.", "λ"))
+
   return()
 }
 
@@ -150,7 +155,7 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
   )
 
   if (isTryError(out)) {
-    outputTable$setError(gettext(as.character(out)))
+    outputTable$setError(.extractErrorMessage(out))
     return(NULL)
   }
 
@@ -165,8 +170,11 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
     stringsAsFactors = FALSE
   )
 
-  if (options[["rateCi"]])
-    row <- .addCiPR(row, events, time, rate, options, outputTable, method = "exact")
+  # The exact CI is already part of the same poisson.test fit; reuse it.
+  if (options[["rateCi"]]) {
+    row$ciLower <- out$conf.int[1]
+    row$ciUpper <- out$conf.int[2]
+  }
 
   return(row)
 }
@@ -182,7 +190,7 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
   )
 
   row <- data.frame(
-    method    = gettext("Normal approximation"),
+    method    = gettext("Normal approx."),
     events    = as.integer(events),
     time      = time,
     rate      = rate,
@@ -193,44 +201,26 @@ oneSamplePoissonRate <- function(jaspResults, dataset, options) {
   )
 
   if (options[["rateCi"]])
-    row <- .addCiPR(row, events, time, rate, options, outputTable, method = "normal")
+    row <- .addNormalCiPR(row, rate, time, options)
 
   return(row)
 }
 
-.addCiPR <- function(row, events, time, rate, options, outputTable, method) {
-  if (method == "exact") {
-    ciOut <- try(
-      stats::poisson.test(x           = events,
-                          T           = time,
-                          r           = options[["testRate"]],
-                          alternative = options[["alternative"]],
-                          conf.level  = options[["confLevel"]]),
-      silent = TRUE
-    )
-    if (isTryError(ciOut)) {
-      outputTable$addFootnote(gettext("Exact CI could not be computed."), symbol = gettext("<b>Warning:</b>"))
-      row$ciLower <- NA
-      row$ciUpper <- NA
-    } else {
-      row$ciLower <- ciOut$conf.int[1]
-      row$ciUpper <- ciOut$conf.int[2]
-    }
-  } else { # normal approximation CI
-    alpha <- 1 - options[["confLevel"]]
-    z     <- stats::qnorm(1 - alpha / ifelse(options[["alternative"]] == "two.sided", 2, 1))
-    se    <- sqrt(rate / time)
+# Normal-approximation CI for the rate: rate +/- z * sqrt(rate / time), clamped at 0.
+.addNormalCiPR <- function(row, rate, time, options) {
+  alpha <- 1 - options[["confLevel"]]
+  z     <- stats::qnorm(1 - alpha / ifelse(options[["alternative"]] == "two.sided", 2, 1))
+  se    <- sqrt(rate / time)
 
-    if (options[["alternative"]] == "two.sided") {
-      row$ciLower <- max(0, rate - z * se)
-      row$ciUpper <- rate + z * se
-    } else if (options[["alternative"]] == "greater") {
-      row$ciLower <- max(0, rate - z * se)
-      row$ciUpper <- Inf
-    } else {
-      row$ciLower <- 0
-      row$ciUpper <- rate + z * se
-    }
+  if (options[["alternative"]] == "two.sided") {
+    row$ciLower <- max(0, rate - z * se)
+    row$ciUpper <- rate + z * se
+  } else if (options[["alternative"]] == "greater") {
+    row$ciLower <- max(0, rate - z * se)
+    row$ciUpper <- Inf
+  } else {
+    row$ciLower <- 0
+    row$ciUpper <- rate + z * se
   }
   return(row)
 }

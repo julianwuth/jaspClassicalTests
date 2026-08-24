@@ -35,7 +35,7 @@ Form
 		preferredHeight: jaspTheme.smallDefaultVariablesFormHeight
 		AvailableVariablesList { name: "allVariablesList" }
 		AssignedVariablesList { name: "variables"; title: qsTr("Variables"); allowedColumns: [ "nominal"]; maxLevels:  50}
-		AssignedVariablesList { name: "counts";    title: qsTr("Counts (optional)"); allowedColumns: ["scale"]; singleVariable: true }
+		AssignedVariablesList { name: "counts";    title: qsTr("Counts (optional)"); allowedColumns: ["scale"]; singleVariable: true; info: qsTr("The number of observations per row. Rows with an empty count cell are excluded from the analysis; if no row has a count, the analysis stops with a message.") }
 	}
 
 	FormulaField { name: "testValue"; label: qsTr("Test value: "); value: "0.5" ; min: 0; max: 1; Layout.columnSpan: 2; info: qsTr("The proportion of the variable under the null hypothesis - the baseline for comparison.") }

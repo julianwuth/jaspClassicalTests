@@ -3,73 +3,49 @@ import JASP.Module
 
 Description
 {
-	name		: "jaspHypothesisTests"
-	title		: qsTr("Hypothesis Tests")
+	name		: "jaspClassicalTests"
+	title		: qsTr("Classical Tests")
 	description	: qsTr("Module that bundles hypothesis tests.")
 	version		: "0.1"
 	author		: "JASP Team"
 	maintainer	: "JASP Team <info@jasp-stats.org>"
 	website		: "https://jasp-stats.org"
 	license		: "GPL (>= 2)"
-	icon        : "exampleIcon.png" // Located in /inst/icons/
+	icon        : "ribbon-classical-tests.svg" // Located in /inst/icons/
 	preloadData: true
 	requiresData: true
 
 	GroupTitle
 	{
-		title: qsTr("Mean")
+		title: qsTr("Means")
+        icon: "param-mu-grey.svg"
 	}
 
 	Analysis
 	{
-		title: qsTr("One Sample Tests") // Title for window
-		menu: qsTr("One Sample Tests")  // Title for ribbon
-		func: "oneSampleTests"           // Function to be called
-		qml: "oneSampleTests.qml"               // Design input window
+		title: qsTr("One Mean") 
+		menu: qsTr("One Mean")  
+		func: "oneSampleTests"
+		qml: "oneSampleTests.qml"
 		requiresData: true                
 	}
 	
 
 	Analysis
 	{
-		title: qsTr("Independent Samples Tests") // Title for window
-		menu: qsTr("Independent Samples Tests")  // Title for ribbon
-		func: "independentSamplesTests"           // Function to be called
-		qml: "independentSamplesTests.qml"               // Design input window
+		title: qsTr("Two Independent Means") 
+		menu: qsTr("Two Independent Means")  
+		func: "independentSamplesTests"
+		qml: "independentSamplesTests.qml"
 		requiresData: true                
 	}
 
 	Analysis
 	{
-		title: qsTr("Paired Samples Tests") // Title for window
-		menu: qsTr("Paired Samples Tests")  // Title for ribbon
-		func: "pairedSamplesTests"           // Function to be called
-		qml: "pairedSamplesTests.qml"               // Design input window
-		requiresData: true                
-	}
-
-	Separator{}
-
-	GroupTitle
-	{
-		title: qsTr("Proportion")
-	}
-
-	Analysis
-	{
-		title: qsTr("Single Proportion") // Title for window
-		menu: qsTr("Single Proportion")  // Title for ribbon
-		func: "singleProportion"           // Function to be called
-		qml: "singleProportion.qml"               // Design input window
-		requiresData: true                
-	}
-
-	Analysis
-	{
-		title: qsTr("Multiple Proportions") // Title for window
-		menu: qsTr("Multiple Proportions")  // Title for ribbon
-		func: "multipleProportions"           // Function to be called
-		qml: "multipleProportions.qml"               // Design input window
+		title: qsTr("Two Dependent Means") 
+		menu: qsTr("Two Dependent Means")  
+		func: "pairedSamplesTests"
+		qml: "pairedSamplesTests.qml"
 		requiresData: true                
 	}
 
@@ -77,13 +53,49 @@ Description
 
 	GroupTitle
 	{
-		title: qsTr("Rate")
+		title: qsTr("Proportions")
+        icon: "param-pi-grey.svg"
 	}
 
 	Analysis
 	{
-		title:        qsTr("One Sample Poisson Rate")
-		menu:         qsTr("One Sample Poisson Rate")
+		title: qsTr("One Proportion") 
+		menu: qsTr("One Proportion")  
+		func: "singleProportion"
+		qml: "singleProportion.qml"
+		requiresData: true                
+	}
+
+	Analysis
+	{
+		title: qsTr("Two Proportions") 
+		menu: qsTr("Two Proportions")  
+		func: "twoProportions"
+		qml: "twoProportions.qml"
+		requiresData: true
+	}
+
+	Analysis
+	{
+		title: qsTr("> 2 Proportions") 
+		menu: qsTr("> 2 Proportions")  
+		func: "multipleProportions"
+		qml: "multipleProportions.qml"
+		requiresData: true
+	}
+
+	Separator{}
+
+	GroupTitle
+	{
+		title: qsTr("Rates")
+        icon: "param-lambda-grey.svg"
+	}
+
+	Analysis
+	{
+		title:        qsTr("One Rate")
+		menu:         qsTr("One Rate")
 		func:         "oneSamplePoissonRate"
 		qml:          "oneSamplePoissonRate.qml"
 		requiresData: false
@@ -91,8 +103,8 @@ Description
 
 	Analysis
 	{
-		title:        qsTr("Two Sample Poisson Rate")
-		menu:         qsTr("Two Sample Poisson Rate")
+		title:        qsTr("Two Rates")
+		menu:         qsTr("Two Rates")
 		func:         "twoSamplePoissonRate"
 		qml:          "twoSamplePoissonRate.qml"
 		requiresData: false
@@ -102,24 +114,60 @@ Description
 
 	GroupTitle
 	{
-		title: qsTr("Variance")
+		title: qsTr("Variances")
+        icon: "param-sigma2-grey.svg"
 	}
 
 	Analysis
 	{
-		title: qsTr("Single Variance") // Title for window
-		menu: qsTr("Single Variance")  // Title for ribbon
-		func: "singleVariance"           // Function to be called
-		qml: "singleVariance.qml"               // Design input window
-		requiresData: true                
+		title: qsTr("One Variance")
+		menu: qsTr("One Variance")
+		func: "singleVariance"
+		qml: "singleVariance.qml"
+		requiresData: false
 	}
 
 	Analysis
 	{
-		title: qsTr("Multiple Variances") // Title for window
-		menu: qsTr("Multiple Variances")  // Title for ribbon
-		func: "multipleVariances"           // Function to be called
-		qml: "multipleVariances.qml"               // Design input window
-		requiresData: true                
+		title: qsTr("Multiple Variances")
+		menu: qsTr("Multiple Variances")
+		func: "multipleVariances"
+		qml: "multipleVariances.qml"
+		requiresData: false
+	}
+
+	Separator{}
+
+	GroupTitle
+	{
+		title: qsTr("Correlations")
+        icon: "param-rho-grey.svg"
+	}
+
+	Analysis
+	{
+		title: qsTr("One Correlation") 
+		menu: qsTr("One Correlation")  
+		func: "oneCorrelation"
+		qml: "oneCorrelation.qml"
+		requiresData: true
+	}
+
+	Analysis
+	{
+		title: qsTr("Two Correlations") 
+		menu: qsTr("Two Correlations")  
+		func: "twoCorrelations"
+		qml: "twoCorrelations.qml"
+		requiresData: true
+	}
+
+	Analysis
+	{
+		title: qsTr("> 2 Correlations") 
+		menu: qsTr("> 2 Correlations")  
+		func: "multipleCorrelations"
+		qml: "multipleCorrelations.qml"
+		requiresData: true
 	}
 }

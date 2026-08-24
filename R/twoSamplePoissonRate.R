@@ -58,7 +58,9 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
     for (i in 1:2) {
       mask   <- !is.na(groupCol) & groupCol == lvls[i]
       counts <- stats::na.omit(countCol[mask])
-      events <- as.integer(round(sum(counts))) # TODO does this have to be rounded?
+      # poisson.test requires an integer event count; round the summed raw counts
+      # (consistent with the one-sample rate analysis).
+      events <- as.integer(round(sum(counts)))
 
       if (options[["time"]] != "") {
         timeCol <- dataset[[options[["time"]]]]
@@ -75,10 +77,10 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
     groups <- list(
       list(name   = if (nchar(n1) > 0) n1 else gettext("Group 1"),
            events = options[["groupOneOccurrences"]],
-           time   = options[["groupOneSampleSize"]]),
+           time   = options[["groupOneInterval"]]),
       list(name   = if (nchar(n2) > 0) n2 else gettext("Group 2"),
            events = options[["groupTwoOccurrences"]],
-           time   = options[["groupTwoSampleSize"]])
+           time   = options[["groupTwoInterval"]])
     )
   }
   groups[[1]]$rate <- groups[[1]]$events / groups[[1]]$time
@@ -94,15 +96,15 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
 
   descTable <- createJaspTable(title = gettext("Descriptive Statistics"))
   descTable$dependOn(c("inputType", "count", "group", "time",
-                       "groupOneName", "groupOneOccurrences", "groupOneSampleSize",
-                       "groupTwoName", "groupTwoOccurrences", "groupTwoSampleSize",
+                       "groupOneName", "groupOneOccurrences", "groupOneInterval",
+                       "groupTwoName", "groupTwoOccurrences", "groupTwoInterval",
                        "descriptives", "descriptiveCi", "descriptiveConfLevel"))
   descTable$position <- 1
   jaspResults[["descriptivesTable"]] <- descTable
 
   descTable$addColumnInfo(name = "groupName", title = gettext("Group"),       type = "string")
   descTable$addColumnInfo(name = "events",    title = gettext("Occurrences"), type = "integer")
-  descTable$addColumnInfo(name = "time",      title = gettext("N"),           type = "number")
+  descTable$addColumnInfo(name = "time",      title = gettext("Interval"),    type = "number")
   descTable$addColumnInfo(name = "rate",      title = gettext("Rate"),        type = "number")
 
   if (options[["descriptiveCi"]]) {
@@ -120,7 +122,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
 
   groupData <- try(.getGroupDataTR(dataset, options), silent = TRUE)
   if (isTryError(groupData)) {
-    descTable$setError(gettext(as.character(groupData)))
+    descTable$setError(.extractErrorMessage(groupData))
     return()
   }
 
@@ -150,7 +152,9 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   })
 
   descTable$setData(do.call(rbind, rows))
-  descTable$addFootnote(gettext("Confidence interval based on exact Poisson distribution."))
+
+  if (options[["descriptiveCi"]])
+    descTable$addFootnote(gettextf("Confidence interval for %s based on the exact Poisson distribution.", "λ"))
 
   return()
 }
@@ -163,8 +167,8 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
 
   outputTable <- createJaspTable(title = gettext("Two-Sample Poisson Rate Test"))
   outputTable$dependOn(c("inputType", "count", "group", "time",
-                         "groupOneName", "groupOneOccurrences", "groupOneSampleSize",
-                         "groupTwoName", "groupTwoOccurrences", "groupTwoSampleSize",
+                         "groupOneName", "groupOneOccurrences", "groupOneInterval",
+                         "groupTwoName", "groupTwoOccurrences", "groupTwoInterval",
                          "testTarget", "exactTest", "normalApprox", "pooledSe",
                          "testRatio", "testDifference",
                          "alternative", "confLevel", "ratioCi", "ciMethod"))
@@ -186,7 +190,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   outputTable$addColumnInfo(name = "pValue", title = gettext("p"), type = "pvalue")
 
   if (options[["ratioCi"]]) {
-    ciTitle <- gettextf("%i%% CI for %s", as.integer(options[["confLevel"]] * 100), ciEffectName)
+    ciTitle <- gettextf("%i%% CI on %s", as.integer(options[["confLevel"]] * 100), ciEffectName)
     outputTable$addColumnInfo(name = "ciLower", title = gettext("Lower"), type = "number",
                               overtitle = ciTitle)
     outputTable$addColumnInfo(name = "ciUpper", title = gettext("Upper"), type = "number",
@@ -206,7 +210,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
 .fillMainTableTR <- function(outputTable, dataset, options) {
   groupData <- try(.getGroupDataTR(dataset, options), silent = TRUE)
   if (isTryError(groupData)) {
-    outputTable$setError(gettext(as.character(groupData)))
+    outputTable$setError(.extractErrorMessage(groupData))
     return()
   }
 
@@ -249,26 +253,36 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
     d0 <- options[["testDifference"]]
     outputTable$addFootnote(
       switch(options[["alternative"]],
-        "two.sided" = gettextf("H\u2080: Rate\u2081 \u2212 Rate\u2082 = %.4g.", d0),
+        "two.sided" = gettextf("H\u2081: Rate\u2081 \u2212 Rate\u2082 \u2260 %.4g.", d0),
         "greater"   = gettextf("H\u2081: Rate\u2081 \u2212 Rate\u2082 > %.4g.", d0),
         "less"      = gettextf("H\u2081: Rate\u2081 \u2212 Rate\u2082 < %.4g.", d0)
       )
     )
-    if (options[["ratioCi"]])
-      outputTable$addFootnote(gettext("Confidence interval based on the unpooled standard error."))
+    if (options[["ratioCi"]]) {
+      if (options[["ciMethod"]] == "exact")
+        outputTable$addFootnote(gettext("Confidence interval for the difference based on the MOVER method combining exact single-rate Poisson intervals (Zou & Donner, 2008)."))
+      else
+        outputTable$addFootnote(gettext("Confidence interval for the difference based on the unpooled standard-error normal approximation."))
+    }
   } else {
     r0 <- options[["testRatio"]]
     outputTable$addFootnote(
       switch(options[["alternative"]],
-        "two.sided" = gettextf("H\u2080: Rate\u2081/Rate\u2082 = %.4g.", r0),
+        "two.sided" = gettextf("H\u2081: Rate\u2081/Rate\u2082 \u2260 %.4g.", r0),
         "greater"   = gettextf("H\u2081: Rate\u2081/Rate\u2082 > %.4g.", r0),
         "less"      = gettextf("H\u2081: Rate\u2081/Rate\u2082 < %.4g.", r0)
       )
     )
+    if (options[["ratioCi"]]) {
+      if (options[["ciMethod"]] == "exact")
+        outputTable$addFootnote(gettext("Confidence interval for the ratio based on the exact conditional Poisson method (matching the exact test)."))
+      else
+        outputTable$addFootnote(gettext("Confidence interval for the ratio based on the Wald approximation for the log rate-ratio; the accompanying normal-approximation test uses a conditional binomial score statistic."))
+    }
   }
 
   outputTable$addFootnote(
-    gettextf("Group 1: %1$s. Group 2: %2$s.", g1$name, g2$name)
+    gettextf("Group 1 = %1$s; Group 2 = %2$s.", g1$name, g2$name)
   )
 
   return()
@@ -285,7 +299,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   )
 
   if (isTryError(out)) {
-    outputTable$setError(gettext(as.character(out)))
+    outputTable$setError(.extractErrorMessage(out))
     return(NULL)
   }
 
@@ -314,7 +328,8 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   r0 <- options[["testRatio"]]
 
   # Conditional binomial score test: X1 | X1+X2 ~ Bin(n, p0)
-  n  <- x1 + x2 # TODO this overflows for huge values
+  # Add as doubles so the total cannot overflow R's 32-bit integer type.
+  n  <- as.numeric(x1) + as.numeric(x2)
   p0 <- r0 * T1 / (r0 * T1 + T2)
 
   if (n == 0) {
@@ -366,7 +381,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   )
 
   if (isTryError(out)) {
-    outputTable$setError(gettext(as.character(out)))
+    outputTable$setError(.extractErrorMessage(out))
     return(NULL)
   }
 
@@ -381,10 +396,8 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
     stringsAsFactors = FALSE
   )
 
-  if (options[["ratioCi"]]) {
-    row$ciLower <- NA
-    row$ciUpper <- NA
-  }
+  if (options[["ratioCi"]])
+    row <- .addDiffCiTR(row, g1, g2, options)
 
   return(row)
 }
@@ -395,7 +408,7 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   d0 <- options[["testDifference"]]
 
   if (T1 <= 0 || T2 <= 0) {
-    outputTable$setError(gettext("Normal approximation requires positive sample sizes in both groups."))
+    outputTable$setError(gettext("Normal approximation requires a positive interval in both groups."))
     return(NULL)
   }
 
@@ -404,6 +417,13 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   sePooled   <- sqrt(pooledRate * (1 / T1 + 1 / T2))
   seUnpooled <- sqrt(g1$rate / T1 + g2$rate / T2)
   se         <- if (options[["pooledSe"]]) sePooled else seUnpooled
+
+  # The pooled rate is the null-restricted estimate only when the hypothesized
+  # difference is 0; otherwise the pooled standard error does not match H0.
+  if (options[["pooledSe"]] && d0 != 0)
+    outputTable$addFootnote(
+      gettextf("The pooled standard error assumes a hypothesized difference of 0, but the hypothesized difference is %.4g. Select the unpooled standard error instead.", d0),
+      symbol = gettext("<b>Warning:</b>"))
 
   if (!is.finite(se) || se == 0) {
     outputTable$setError(gettext("Normal approximation for the difference could not be computed (zero standard error)."))
@@ -430,12 +450,23 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   )
 
   if (options[["ratioCi"]])
-    row <- .addDiffCiTR(row, g1, g2, seUnpooled, options)
+    row <- .addDiffCiTR(row, g1, g2, options)
 
   return(row)
 }
 
-.addDiffCiTR <- function(row, g1, g2, seUnpooled, options) {
+# Dispatch the difference CI on the selected method:
+#   exact  -> MOVER interval from exact single-rate Poisson intervals
+#   normal -> unpooled Wald interval
+.addDiffCiTR <- function(row, g1, g2, options) {
+  if (options[["ciMethod"]] == "exact")
+    return(.moverDiffCiTR(row, g1, g2, options))
+  return(.waldDiffCiTR(row, g1, g2, options))
+}
+
+.waldDiffCiTR <- function(row, g1, g2, options) {
+  seUnpooled <- sqrt(g1$rate / g1$time + g2$rate / g2$time)
+
   if (!is.finite(seUnpooled)) {
     row$ciLower <- NA
     row$ciUpper <- NA
@@ -459,6 +490,57 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
   return(row)
 }
 
+# MOVER (Method of Variance Estimates Recovery) CI for the rate difference.
+# Combines the exact single-rate Poisson intervals (l_i, u_i) into an interval
+# for Rate1 - Rate2. Zou, G. Y., & Donner, A. (2008). Construction of confidence
+# limits about effect measures: A general approach. Statistics in Medicine,
+# 27(10), 1693-1702. Formulas:
+#   Lower = d - sqrt((r1 - l1)^2 + (u2 - r2)^2)
+#   Upper = d + sqrt((u1 - r1)^2 + (r2 - l2)^2)
+# One-sided alternatives use one-sided single-rate limits at the same level.
+.moverDiffCiTR <- function(row, g1, g2, options) {
+  r1  <- g1$rate
+  r2  <- g2$rate
+  d   <- r1 - r2
+  cl  <- options[["confLevel"]]
+  alt <- options[["alternative"]]
+
+  # exact one-sided Poisson limits for a single rate (events / time)
+  lowerLimit <- function(events, time)
+    stats::poisson.test(events, time, conf.level = cl, alternative = "greater")$conf.int[1]
+  upperLimit <- function(events, time)
+    stats::poisson.test(events, time, conf.level = cl, alternative = "less")$conf.int[2]
+
+  limits <- try(
+    if (alt == "two.sided") {
+      ci1 <- stats::poisson.test(g1$events, g1$time, conf.level = cl)$conf.int
+      ci2 <- stats::poisson.test(g2$events, g2$time, conf.level = cl)$conf.int
+      l1  <- ci1[1]; u1 <- ci1[2]
+      l2  <- ci2[1]; u2 <- ci2[2]
+      c(d - sqrt((r1 - l1)^2 + (u2 - r2)^2),
+        d + sqrt((u1 - r1)^2 + (r2 - l2)^2))
+    } else if (alt == "greater") {
+      l1 <- lowerLimit(g1$events, g1$time)
+      u2 <- upperLimit(g2$events, g2$time)
+      c(d - sqrt((r1 - l1)^2 + (u2 - r2)^2), Inf)
+    } else {
+      u1 <- upperLimit(g1$events, g1$time)
+      l2 <- lowerLimit(g2$events, g2$time)
+      c(-Inf, d + sqrt((u1 - r1)^2 + (r2 - l2)^2))
+    },
+    silent = TRUE
+  )
+
+  if (isTryError(limits)) {
+    row$ciLower <- NA
+    row$ciUpper <- NA
+  } else {
+    row$ciLower <- limits[1]
+    row$ciUpper <- limits[2]
+  }
+  return(row)
+}
+
 .addRatioCiTR <- function(row, g1, g2, options, outputTable) {
   if (options[["ciMethod"]] == "exact") {
     ciOut <- try(
@@ -477,8 +559,12 @@ twoSamplePoissonRate <- function(jaspResults, dataset, options) {
       row$ciLower <- ciOut$conf.int[1]
       row$ciUpper <- ciOut$conf.int[2]
     }
-  } else { # log-transform normal CI for ratio
-    # TODO check if this is correct
+  } else { # Wald CI for the log rate-ratio
+    # Standard Wald interval for a Poisson rate ratio: Var(log(rate1/rate2)) = 1/x1 + 1/x2
+    # (delta method), so CI = (rate1/rate2) * exp(+/- z * sqrt(1/x1 + 1/x2)). Verified to
+    # match a Poisson-GLM Wald interval (Rothman, Greenland & Lash, 2008). Undefined if a
+    # count is 0. Note the accompanying normal-approx test is a conditional binomial score
+    # test, so the ratio test statistic and this CI use different approximations.
     x1 <- g1$events
     x2 <- g2$events
     if (x1 == 0 || x2 == 0) {
