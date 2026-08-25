@@ -59,3 +59,13 @@ Thumbs.db
 .Rproj.user
 
 _processedLockFile.lock
+
+# AI files
+.agents/
+.claude/
+.codex/
+.vscode/
+.mcp.json
+AGENTS.md
+codex.toml
+MIGRATION.md
