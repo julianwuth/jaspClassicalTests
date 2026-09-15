@@ -6,7 +6,7 @@ Description
 	name		: "jaspClassicalTests"
 	title		: qsTr("Classical Tests")
 	description	: qsTr("Module that bundles hypothesis tests.")
-	version		: "0.1"
+	version		: "0.1.1"
 	author		: "JASP Team"
 	maintainer	: "JASP Team <info@jasp-stats.org>"
 	website		: "https://jasp-stats.org"

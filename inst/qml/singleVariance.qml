@@ -56,77 +56,92 @@ Form
 		AssignedVariablesList { name: "dependent"; title: qsTr("Variables"); info: qsTr("In this box the dependent variable is selected.") ; allowedColumns: ["scale"]; minNumericLevels: 2 }
 	}
 
-    Group
-    {
-        title:   qsTr("Summarized data")
-        enabled: inputSummarized.checked
-        columns: 2
-
-        DoubleField
-        {
-            name:         "sampleVariance"
-            label:        qsTr("Sample variance")
-            defaultValue: 1
-            min:          0
-            inclusive:    JASP.MaxOnly
-            decimals:     3
-            info:         qsTr("The observed sample variance.")
-        }
-
-        IntegerField
-        {
-            name:         "sampleSize"
-            label:        qsTr("Sample size")
-            defaultValue: 2
-            min:          2
-            info:         qsTr("The number of observations the sample variance is based on.")
-        }
-    }
-
-    Group 
-    {
-        title: qsTr("Tests")
-
-        CheckBox 
-        {
-            label: qsTr("χ² test")
-            name: "chiSquareTest"
-            checked: true
-        }
-        
-        DoubleField
-        {
-            label: qsTr("Test value:")
-            name: "testVariance"
-            defaultValue: 1
-            decimals: 3
-            inclusive: JASP.MaxOnly
-        }
-    }
-
-    RadioButtonGroup
+	Group
 	{
-		name: "alternative"
-		title: qsTr("Alternative Hypothesis")
-		// the values fit the input pattern of the underlying R package
-		RadioButton
+        Group
         {
-            value: "two.sided"
-            label: qsTr("≠ Test value");
-            info: qsTr("Two sided alternative hypothesis that the sample variance is not equal to the test value. Selected by default."); checked: true
+            title:   qsTr("Summarized data")
+            enabled: inputSummarized.checked
+            columns: 2
+
+            DoubleField
+            {
+                name:         "sampleVariance"
+                label:        qsTr("Sample variance")
+                defaultValue: 1
+                min:          0
+                inclusive:    JASP.MaxOnly
+                decimals:     3
+                info:         qsTr("The observed sample variance.")
+            }
+
+            IntegerField
+            {
+                name:         "sampleSize"
+                label:        qsTr("Sample size")
+                defaultValue: 2
+                min:          2
+                info:         qsTr("The number of observations the sample variance is based on.")
+            }
         }
-		RadioButton 
-        { 
-            value: "greater"	
-            label: qsTr("> Test value")	; 
-            info: qsTr("One sided alternative hypothesis that the sample variance is greater than the test value.")				
+
+        // some space
+        Item
+        {
+            height: 10
         }
-		RadioButton 
-        { 
-            value: "less"		
-            label: qsTr("< Test value")	; 
-            info: qsTr("One sided alternative hypothesis that the sample variance is less than the test value.")				
+
+        Group
+        {
+            DoubleField
+            {
+                label: qsTr("Test value:")
+                name: "testVariance"
+                defaultValue: 1
+                decimals: 3
+                min: 0
+                inclusive: JASP.MaxOnly
+            }
+
+            RadioButtonGroup
+            {
+                name: "alternative"
+                title: qsTr("Alternative Hypothesis")
+                // the values fit the input pattern of the underlying R package
+                RadioButton
+                {
+                    value: "two.sided"
+                    label: qsTr("≠ Test value");
+                    info: qsTr("Two sided alternative hypothesis that the sample variance is not equal to the test value. Selected by default."); checked: true
+                }
+                RadioButton
+                {
+                    value: "greater"
+                    label: qsTr("> Test value");
+                    info: qsTr("One sided alternative hypothesis that the sample variance is greater than the test value.")
+                }
+                RadioButton
+                {
+                    value: "less"
+                    label: qsTr("< Test value");
+                    info: qsTr("One sided alternative hypothesis that the sample variance is less than the test value.")
+                }
+            }
         }
+
+        // some space
+        Item
+        {
+            height: 10
+        }
+
+        Group
+    	{
+    		title: qsTr("Assumption checks")
+    		enabled: inputRawData.checked
+    		CheckBox { name: "normalityTest"; label: qsTr("Normality"); info: qsTr("Shapiro-Wilk test of normality.") }
+    		CheckBox { name: "qqPlot";		 	label: qsTr("Q-Q plot residuals"); info: qsTr("Q-Q plot of the standardized residuals.") }
+    	}
 	}
 
     Group
@@ -147,6 +162,12 @@ Form
             name:  "sdEstimate"
 
             CheckBox { name: "sdCi"; label: qsTr("Confidence interval"); id: sdCi; info: qsTr("Confidence interval for the population standard deviation. It is the square root of the variance interval, which preserves the coverage exactly.") }
+        }
+
+        // some space
+        Item
+        {
+            height: 10
         }
 
         Group
@@ -184,13 +205,5 @@ Form
             SetSeed { enabled: inputRawData.checked && ciMethod.value === "bootstrap" }
         }
     }
-
-    Group
-	{
-		title: qsTr("Assumption checks")
-		enabled: inputRawData.checked
-		CheckBox { name: "normalityTest"; label: qsTr("Normality"); info: qsTr("Shapiro-Wilk test of normality.") }
-		CheckBox { name: "qqPlot";		 	label: qsTr("Q-Q plot residuals"); info: qsTr("Q-Q plot of the standardized residuals.") }
-	}
 
 }

@@ -18,7 +18,7 @@
 # Shared helpers for the variance analyses (singleVariance, multipleVariances).
 
 # Build a sample with exactly the requested size and variance so summarized input
-# runs through the same VarTest / VarCI / var.test code path as raw data.
+# runs through the same var.test / bartlett.test code path as raw data (multipleVariances).
 .syntheticSampleSV <- function(n, variance) {
   z <- seq_len(n) - (n + 1) / 2 # centered sequence
   z / sd(z) * sqrt(variance)

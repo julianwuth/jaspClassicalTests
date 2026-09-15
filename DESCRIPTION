@@ -1,7 +1,7 @@
 Package: jaspClassicalTests
 Type: Package
 Title: A JASP module for classical tests.
-Version: 0.1.0
+Version: 0.1.1
 Date: 2026-08-08
 Authors@R:
     person("JASP Team", role = c("aut", "cre"), email = "info@jasp-stats.org")

@@ -99,7 +99,6 @@ test_that("Single Variance Test summarized input matches VarTest", {
   options$sampleVariance <- 4.2
   options$sampleSize     <- 30
   options$testVariance   <- 1
-  options$chiSquareTest  <- TRUE
   options$varEstimate    <- TRUE
   options$sdEstimate     <- TRUE
   options$varianceCi     <- TRUE
@@ -187,4 +186,28 @@ test_that("Summarized input falls back to the chi-square interval", {
 
   notes <- vapply(bootstrapResults[["results"]][["outputTable"]][["footnotes"]], function(x) x$text, character(1))
   expect_true(any(grepl("require the raw observations", notes)))
+})
+
+test_that("Single Variance Test two-sided p-value is stable for df = 2 and extreme statistics", {
+  options <- analysisOptions("singleVariance")
+  options$inputType   <- "summarized"
+  options$varEstimate <- TRUE
+  options$varianceCi  <- TRUE
+  options$alternative <- "two.sided"
+
+  # df = 2: the density is monotone, so the p-value is the upper tail exp(-chiSquare / 2)
+  options$sampleVariance <- 4.2
+  options$sampleSize     <- 3
+  row <- runAnalysis("singleVariance", data.frame(dummy = rnorm(3)), options)[["results"]][["outputTable"]][["data"]][[1]]
+  expect_equal(row$chiSquare, 8.4)
+  expect_equal(row$pValue, exp(-4.2))
+  expect_equal(c(row$ciLower, row$ciUpper), 8.4 / qchisq(c(0.975, 0.025), 2))
+
+  # chi-square of 1485 on 99 df: the equal-density root search of DescTools::VarTest underflowed here
+  options$sampleVariance <- 15
+  options$sampleSize     <- 100
+  row <- runAnalysis("singleVariance", data.frame(dummy = rnorm(3)), options)[["results"]][["outputTable"]][["data"]][[1]]
+  expect_length(row$pValue, 1)
+  expect_gt(row$pValue, 0)
+  expect_lt(row$pValue, 1e-200)
 })

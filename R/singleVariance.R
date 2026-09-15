@@ -21,15 +21,15 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
   # makes the bootstrap confidence interval reproducible when the user sets a seed
   jaspBase::.setSeedJASP(options)
 
-  # is ready if test is selected and data was provided
+  # is ready if data was provided
   if (options[["inputType"]] == "rawData") {
-    ready <- (ncol(dataset) > 0 && options[["chiSquareTest"]])
+    ready <- ncol(dataset) > 0
     if (ready)
       .hasErrors(dataset, type = c('infinity', 'variance'),
                  all.target = options[["dependent"]], variance.equalTo = 0,
                  exitAnalysisIfErrors = TRUE)
   } else {
-    ready <- options[["chiSquareTest"]]
+    ready <- TRUE
   }
 
   .pruneDisabledOutputSV(jaspResults, options)
@@ -72,7 +72,7 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
     return()
 
   outputTable <- createJaspTable(title = gettext("Single Variance Test"))
-  outputTable$dependOn(c("alternative", "chiSquareTest", "ciMethod", "confLevel", "dependent",
+  outputTable$dependOn(c("alternative", "ciMethod", "confLevel", "dependent",
                          "sdEstimate", "sdCi", "testVariance", "varEstimate", "varianceCi",
                          "bootstrapSamples", "setSeed", "seed",
                          "inputType", "sampleVariance", "sampleSize"))
@@ -136,9 +136,9 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
   # add footnote describing the hypothesis
   outputTable$addFootnote(
     switch(options[["alternative"]],
-           "two.sided" = gettextf("For all tests, the alternative hypothesis is that the variance is not equal to %.2f.", round(options[["testVariance"]], 2)), # explicit rounding because gettextf would round 2.255 to 2.25
-           "greater" = gettextf("For all tests, the alternative hypothesis is that the variance is greater than %.2f.", round(options[["testVariance"]], 2)),
-           "less" = gettextf("For all tests, the alternative hypothesis is that the variance is less than %.2f.", round(options[["testVariance"]], 2))
+           "two.sided" = gettextf("For all tests, the alternative hypothesis is that the variance is not equal to %.10g.", options[["testVariance"]]),
+           "greater" = gettextf("For all tests, the alternative hypothesis is that the variance is greater than %.10g.", options[["testVariance"]]),
+           "less" = gettextf("For all tests, the alternative hypothesis is that the variance is less than %.10g.", options[["testVariance"]])
     )
   )
 
@@ -146,41 +146,35 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 }
 
 .computeSVTest <- function(entry, options, outputTable, dataset) {
-  if (options[["inputType"]] == "rawData")
-    col <- na.omit(dataset[[entry[["name"]]]])
-  else
-    col <- .syntheticSampleSV(entry[["n"]], entry[["variance"]])
-
-  if (length(col) < 2) {
+  if (entry[["n"]] < 2) {
     outputTable$addFootnote(gettextf("%s has too few observations after removing missing values.", entry[["name"]]),
                             symbol = gettext("<b>Warning:</b>"))
     return(NULL)
   }
 
-  # Note that the p-value is not the same as 2 * pchisq(test_val, df, lower.tail = FALSE)
-  # for the two-sided test
-  out <- try(DescTools::VarTest(col, alternative = options[["alternative"]],
-                                sigma.squared = options[["testVariance"]],
-                                conf.level = options[["confLevel"]]), silent = TRUE)
-  if (isTryError(out)) {
-    outputTable$setError(.extractErrorMessage(out))
+  # the test and the chi-square interval depend only on the sample variance and size, so both input
+  # types share this code path (same results as DescTools::VarTest)
+  varEst    <- entry[["variance"]]
+  sdEst     <- sqrt(varEst)
+  df        <- entry[["n"]] - 1
+  chiSquare <- df * varEst / options[["testVariance"]]
+
+  pValue <- try(switch(options[["alternative"]],
+                       "two.sided" = .twoSidedPValueSV(chiSquare, df),
+                       "greater"   = pchisq(chiSquare, df, lower.tail = FALSE),
+                       "less"      = pchisq(chiSquare, df)), silent = TRUE)
+  if (isTryError(pValue)) {
+    outputTable$setError(.extractErrorMessage(pValue))
     return(NULL)
   }
 
-  varEst <- out$estimate
-  sdEst <- sqrt(varEst)
-  chiSquare <- out$statistic
-  pValue <- out$p.value
-  df <- out$parameter[1]
-
-  # VarTest already returns the chi-square interval honouring `alternative`; Bonett and the
-  # bootstrap need the raw values, so .ciMethodVar falls back to chi-square for summarized input.
-  # Skip the (potentially expensive) bootstrap entirely when no interval is displayed.
+  # Bonett and the bootstrap need the raw values, so .ciMethodVar falls back to chi-square for
+  # summarized input. Skip the (potentially expensive) bootstrap entirely when no interval is displayed.
   if (.ciMethodVar(options) == "chiSquare" ||
       !(.showVarianceCiSV(options) || .showSdCiSV(options))) {
-    ciRes <- list(lower = out$conf.int[1], upper = out$conf.int[2], error = NULL)
+    ciRes <- .chiSquareVarianceCiSV(varEst, df, options[["confLevel"]], options[["alternative"]])
   } else {
-    ciRes <- .varianceCi(col, options, sides = .getSidesCi(options))
+    ciRes <- .varianceCi(na.omit(dataset[[entry[["name"]]]]), options, sides = .getSidesCi(options))
     if (!is.null(ciRes$error)) {
       outputTable$setError(ciRes$error)
       return(NULL)
@@ -189,11 +183,45 @@ singleVariance <- function(jaspResults, dataset, options, ...) {
 
   sdCiRes <- .sdCiFromVarianceCi(ciRes)
 
-  # remove row names that are induced by the package
   return(data.frame(varEst, sdEst, chiSquare, df, pValue,
                     ciLower   = ciRes$lower,   ciUpper   = ciRes$upper,
-                    sdCiLower = sdCiRes$lower, sdCiUpper = sdCiRes$upper,
-                    row.names = NULL))
+                    sdCiLower = sdCiRes$lower, sdCiUpper = sdCiRes$upper))
+}
+
+# Two-sided p-value as in DescTools::VarTest: the tail beyond the statistic plus the tail beyond the
+# point on the other side of the mode with equal chi-square density. VarTest searches that point on
+# the density scale, which underflows for extreme statistics; the log-density difference below
+# cancels the normalising constants and stays finite.
+.twoSidedPValueSV <- function(stat, df) {
+  mode <- df - 2
+  # density is non-increasing for df <= 2, so every more extreme point lies in the upper tail
+  if (mode <= 0)
+    return(pchisq(stat, df, lower.tail = FALSE))
+  if (stat == mode)
+    return(1)
+
+  logDensDiff <- function(u) (df / 2 - 1) * (u - log(stat)) - (exp(u) - stat) / 2 # u = log(x)
+
+  if (stat > mode) {
+    u <- uniroot(logDensDiff, c(log(mode) - 1, log(mode)), extendInt = "upX", tol = 1e-12)$root
+    p <- pchisq(stat, df, lower.tail = FALSE) + pchisq(exp(u), df)
+  } else {
+    u <- uniroot(logDensDiff, c(log(mode), log(mode) + 1), extendInt = "downX", tol = 1e-12)$root
+    p <- pchisq(stat, df) + pchisq(exp(u), df, lower.tail = FALSE)
+  }
+
+  return(min(1, p))
+}
+
+# Chi-square interval for the variance; one-sided for a one-sided alternative, as in DescTools::VarTest.
+.chiSquareVarianceCiSV <- function(variance, df, confLevel, alternative) {
+  ci <- switch(alternative,
+               "two.sided" = df * variance / c(qchisq((1 - confLevel) / 2, df, lower.tail = FALSE),
+                                               qchisq((1 - confLevel) / 2, df)),
+               "greater"   = c(df * variance / qchisq(1 - confLevel, df, lower.tail = FALSE), Inf),
+               "less"      = c(0, df * variance / qchisq(1 - confLevel, df)))
+
+  return(list(lower = ci[1], upper = ci[2], error = NULL))
 }
 
 # The confidence interval columns require both the estimate and its interval checkbox, mirroring
