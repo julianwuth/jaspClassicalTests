@@ -20,9 +20,12 @@
 # Vovk-Sellke maximum p-ratio (jaspBase).
 
 #' @import jaspBase
-#' @importFrom stats cor cor.test complete.cases pnorm qnorm
+#' @importFrom stats cor cor.test complete.cases pnorm qnorm quantile
 #' @export
 oneCorrelation <- function(jaspResults, dataset, options, ...) {
+  # makes the bootstrap confidence intervals reproducible when the user sets a seed
+  jaspBase::.setSeedJASP(options)
+
   # the scatter plot only needs the two variables, the table also needs a coefficient
   plotReady  <- options[["firstVariable"]] != "" && options[["secondVariable"]] != ""
   tableReady <- plotReady && any(c(options[["pearson"]], options[["spearman"]], options[["kendall"]]))
@@ -61,7 +64,8 @@ oneCorrelation <- function(jaspResults, dataset, options, ...) {
 
   outputTable <- createJaspTable(title = gettext("One Correlation Test"))
   outputTable$dependOn(c("firstVariable", "secondVariable", "pearson", "spearman", "kendall",
-                         "testValue", "alternative", "ci", "ciLevel", "effectSize", "vovkSellke"))
+                         "testValue", "alternative", "ci", "ciLevel", "ciBootstrap", "ciBootstrapSamples",
+                         "setSeed", "seed", "effectSize", "vovkSellke"))
   outputTable$position <- 1
   jaspResults[["outputTable"]] <- outputTable
 
@@ -104,8 +108,13 @@ oneCorrelation <- function(jaspResults, dataset, options, ...) {
                       "less"      = gettextf("The alternative hypothesis is that the population correlation is less than %s.", format(testValue)))
   outputTable$addFootnote(hypLabel)
 
-  if (options[["ci"]] && (options[["spearman"]] || options[["kendall"]]))
-    outputTable$addFootnote(gettext("Confidence intervals are only available for Pearson's r."))
+  if (options[["ci"]]) {
+    if (options[["ciBootstrap"]])
+      outputTable$addFootnote(gettextf("Confidence intervals are percentile bootstrap intervals based on %s replicates.",
+                                       format(options[["ciBootstrapSamples"]], scientific = FALSE)))
+    else if (options[["spearman"]] || options[["kendall"]])
+      outputTable$addFootnote(gettext("Confidence intervals are only available for Pearson's r."))
+  }
 
   if (options[["vovkSellke"]])
     outputTable$addFootnote(gettext("Vovk-Sellke maximum p-ratio: Based on a two-sided p-value, the maximum possible odds in favor of H₁ over H₀ equals 1/(-e p log(p)) for p ≤ .37 (Sellke, Bayarri, & Berger, 2001)."),
@@ -121,15 +130,21 @@ oneCorrelation <- function(jaspResults, dataset, options, ...) {
   y <- y[complete]
   n <- length(x)
 
-  rows <- lapply(.oneCorrelationMethods(options), function(method)
-    .oneCorrelationComputeRow(x, y, n, method, options, outputTable))
+  methods <- .oneCorrelationMethods(options)
+
+  # one set of resamples shared by every coefficient, so the intervals describe the same bootstrap
+  bootstrapCis <- if (options[["ci"]] && options[["ciBootstrap"]])
+    .oneCorrelationBootstrapCis(x, y, methods, options)
+
+  rows <- lapply(methods, function(method)
+    .oneCorrelationComputeRow(x, y, n, method, options, outputTable, bootstrapCis[[method]]))
 
   outputTable$setData(do.call(rbind, rows))
 
   return()
 }
 
-.oneCorrelationComputeRow <- function(x, y, n, method, options, outputTable) {
+.oneCorrelationComputeRow <- function(x, y, n, method, options, outputTable, bootstrapCi = NULL) {
   label     <- .oneCorrelationMethodLabel(method)
   testValue <- options[["testValue"]]
   alt       <- options[["alternative"]]
@@ -157,8 +172,14 @@ oneCorrelation <- function(jaspResults, dataset, options, ...) {
                 "less"      = pnorm(z))
   }
 
-  # CI only defined for Pearson's r; other methods report NA bounds.
-  ci <- if (method == "pearson") .corrFisherCi(r, n, alt, options[["ciLevel"]]) else c(NA, NA)
+  # The analytic (Fisher-z) interval is only defined for Pearson's r; the bootstrap covers
+  # every coefficient, so other methods report NA bounds unless it is switched on.
+  ci <- if (!is.null(bootstrapCi))
+    bootstrapCi
+  else if (method == "pearson")
+    .corrFisherCi(r, n, alt, options[["ciLevel"]])
+  else
+    c(NA, NA)
 
   .oneCorrelationRow(label, n, r, p, ci,
                      effectSize   = atanh(r),
@@ -273,6 +294,51 @@ oneCorrelation <- function(jaspResults, dataset, options, ...) {
   }
 
   return(c(lower, upper))
+}
+
+# Percentile bootstrap confidence intervals for every selected coefficient, following
+# jaspRegression's .corrCalculateBootstrapCI: pairs are resampled with replacement and each
+# coefficient is recomputed on the same resample, so all intervals share one bootstrap
+# distribution of the data. Returns a named list of c(lower, upper), one entry per method.
+.oneCorrelationBootstrapCis <- function(x, y, methods, options) {
+  samples    <- options[["ciBootstrapSamples"]]
+  n          <- length(x)
+  estimates  <- matrix(NA_real_, nrow = samples, ncol = length(methods), dimnames = list(NULL, methods))
+
+  startProgressbar(expectedTicks = samples, label = gettext("Bootstrapping"))
+  for (i in seq_len(samples)) {
+    idx <- sample.int(n, replace = TRUE)
+    for (method in methods)
+      # a resample can be constant in x or y, which makes cor() return NA with a warning
+      estimates[i, method] <- suppressWarnings(tryCatch(cor(x[idx], y[idx], method = method),
+                                                        error = function(e) NA_real_))
+    progressbarTick()
+  }
+
+  cis <- lapply(methods, function(method)
+    .oneCorrelationPercentileCi(estimates[, method], options[["alternative"]], options[["ciLevel"]]))
+  names(cis) <- methods
+
+  return(cis)
+}
+
+# Percentile interval from the bootstrap estimates. One-sided alternatives get a one-sided
+# interval bounded by the range of the coefficient, matching .corrFisherCi.
+.oneCorrelationPercentileCi <- function(estimates, hypothesis = "two.sided", confLevel = 0.95) {
+  if (all(is.na(estimates)))
+    return(c(NA_real_, NA_real_))
+
+  alpha <- 1 - confLevel
+  bound <- function(p) unname(stats::quantile(estimates, probs = p, na.rm = TRUE))
+
+  if (hypothesis == "two.sided")
+    return(c(bound(alpha / 2), bound(1 - alpha / 2)))
+
+  if (hypothesis == "less")
+    return(c(-1, bound(confLevel)))
+
+  # greater
+  return(c(bound(alpha), 1))
 }
 
 # Fisher-transformed effect-size standard errors (same formulas as jaspRegression's .corr.test)

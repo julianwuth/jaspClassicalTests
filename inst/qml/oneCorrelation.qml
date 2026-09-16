@@ -71,9 +71,29 @@ Form
 		{
 			name:  "ci"
 			label: qsTr("Confidence interval")
-			info:  qsTr("Confidence interval for the population correlation (available only for Pearson's r).")
-			childrenOnSameRow: true
-			CIField { name: "ciLevel" }
+			info:  qsTr("Confidence interval for the population correlation. Without bootstrapping it is available only for Pearson's r; with bootstrapping it is available for every selected coefficient.")
+
+			CIField { name: "ciLevel"; label: qsTr("Interval") }
+
+			CheckBox
+			{
+				id:                ciBootstrap
+				name:              "ciBootstrap"
+				label:             qsTr("From")
+				childrenOnSameRow: true
+				info:              qsTr("Percentile bootstrap confidence intervals, available for Pearson's r, Spearman's rho and Kendall's tau-b.")
+
+				IntegerField
+				{
+					name:         "ciBootstrapSamples"
+					defaultValue: 1000
+					min:          100
+					fieldWidth:   50
+					afterLabel:   qsTr("bootstrap samples")
+				}
+			}
+
+			SetSeed { enabled: ciBootstrap.checked }
 		}
 		CheckBox { name: "effectSize"; label: qsTr("Effect size (Fisher's z)"); info: qsTr("The Fisher transformed effect size with its standard error.") }
 		CheckBox { name: "vovkSellke"; label: qsTr("Vovk-Sellke maximum p-ratio"); info: qsTr("The maximum ratio of the likelihood of the observed p-value under H1 vs H0.") }

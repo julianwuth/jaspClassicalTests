@@ -100,3 +100,97 @@ test_that("Fisher-z CI is identical to jaspRegression's implementation", {
     expect_equal(mine, ref)
   }
 })
+
+########## bootstrap confidence intervals ##########
+.oneCorrelationBootstrapOptions <- function(samples = 500, seed = 1, alternative = "two.sided") {
+  options <- analysisOptions("oneCorrelation")
+  options$firstVariable      <- "contcor1"
+  options$secondVariable     <- "contcor2"
+  options$spearman           <- TRUE
+  options$kendall            <- TRUE
+  options$ci                 <- TRUE
+  options$ciBootstrap        <- TRUE
+  options$ciBootstrapSamples <- samples
+  options$setSeed            <- TRUE
+  options$seed               <- seed
+  options$alternative        <- alternative
+  options$scatterPlot        <- FALSE
+  return(options)
+}
+
+.oneCorrelationCis <- function(table) unlist(lapply(table, function(row) c(row$lowerCi, row$upperCi)))
+
+test_that("One Correlation bootstrap CI table results match", {
+  results <- runAnalysis("oneCorrelation", "debug.csv", .oneCorrelationBootstrapOptions())
+  table   <- results[["results"]][["outputTable"]][["data"]]
+  jaspTools::expect_equal_tables(table,
+    list(0.537588272233705, 100, 1.14241004897578e-13, 0.657010063712354,
+         "Pearson's r", 0.766049491426162,
+         0.574649011938366, 100, 0, 0.692277227722772,
+         "Spearman's rho", 0.790516171264867,
+         0.406665176564039, 100, 1.21156930153634e-13, 0.503030303030303,
+         "Kendall's tau B", 0.598017448646125))
+})
+
+test_that("Bootstrap CIs are reproducible per seed and differ across seeds", {
+  runCis <- function(seed)
+    .oneCorrelationCis(runAnalysis("oneCorrelation", "debug.csv",
+                       .oneCorrelationBootstrapOptions(seed = seed))[["results"]][["outputTable"]][["data"]])
+  expect_identical(runCis(1), runCis(1))
+  expect_false(isTRUE(all.equal(runCis(1), runCis(2))))
+})
+
+test_that("One-sided bootstrap CIs are bounded by the correlation range", {
+  less <- runAnalysis("oneCorrelation", "debug.csv",
+                      .oneCorrelationBootstrapOptions(alternative = "less"))[["results"]][["outputTable"]][["data"]]
+  greater <- runAnalysis("oneCorrelation", "debug.csv",
+                         .oneCorrelationBootstrapOptions(alternative = "greater"))[["results"]][["outputTable"]][["data"]]
+
+  expect_equal(vapply(less, function(row) row$lowerCi, numeric(1)), rep(-1, 3))
+  expect_true(all(vapply(less, function(row) row$upperCi, numeric(1)) < 1))
+  expect_equal(vapply(greater, function(row) row$upperCi, numeric(1)), rep(1, 3))
+  expect_true(all(vapply(greater, function(row) row$lowerCi, numeric(1)) > -1))
+})
+
+test_that("Bootstrap footnote replaces the Pearson-only CI footnote", {
+  options <- .oneCorrelationBootstrapOptions(samples = 200)
+  options$pearson <- FALSE
+  results <- runAnalysis("oneCorrelation", "debug.csv", options)
+  notes   <- vapply(results[["results"]][["outputTable"]][["footnotes"]], function(note) note$text, character(1))
+
+  expect_true(any(grepl("percentile bootstrap intervals based on 200 replicates", notes, fixed = TRUE)))
+  expect_false(any(grepl("only available for Pearson", notes, fixed = TRUE)))
+
+  # every non-Pearson coefficient still gets an interval
+  table <- results[["results"]][["outputTable"]][["data"]]
+  expect_true(all(vapply(table, function(row) is.numeric(row$lowerCi) && is.numeric(row$upperCi), logical(1))))
+})
+
+test_that("Without bootstrapping only Pearson's r gets a CI", {
+  options <- analysisOptions("oneCorrelation")
+  options$firstVariable  <- "contcor1"
+  options$secondVariable <- "contcor2"
+  options$spearman       <- TRUE
+  options$ci             <- TRUE
+  options$scatterPlot    <- FALSE
+  results <- runAnalysis("oneCorrelation", "debug.csv", options)
+  table   <- results[["results"]][["outputTable"]][["data"]]
+  notes   <- vapply(results[["results"]][["outputTable"]][["footnotes"]], function(note) note$text, character(1))
+
+  expect_true(is.numeric(table[[1]]$lowerCi))
+  expect_identical(table[[2]]$lowerCi, "")
+  expect_identical(table[[2]]$upperCi, "")
+  expect_true(any(grepl("only available for Pearson", notes, fixed = TRUE)))
+})
+
+test_that("Percentile CI helper returns the expected bounds", {
+  percentileCi <- jaspClassicalTests:::.oneCorrelationPercentileCi
+  estimates    <- seq(0, 1, length.out = 101)
+
+  expect_equal(percentileCi(estimates, "two.sided", 0.90), c(0.05, 0.95))
+  expect_equal(percentileCi(estimates, "less", 0.90), c(-1, 0.90))
+  expect_equal(percentileCi(estimates, "greater", 0.90), c(0.10, 1))
+  # constant resamples yield NA estimates, which must not break the quantiles
+  expect_equal(percentileCi(c(estimates, NA), "two.sided", 0.90), c(0.05, 0.95))
+  expect_identical(percentileCi(rep(NA_real_, 10)), c(NA_real_, NA_real_))
+})
