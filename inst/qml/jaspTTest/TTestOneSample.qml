@@ -25,9 +25,7 @@ import "./common" as Common
 Form
 {
 	info: qsTr("The one sample t-test allows the user to estimate the effect size and test the null hypothesis that the population mean equals a specific constant, i.e., the test value.\n") + 
-    "## " + qsTr("Assumptions") + "\n" + "- The dependent variable is continuous.\n" + "- The data are a random sample from the population.\n" + "- The dependent variable is normally distributed in the population."
-	infoBottom: "## " + qsTr("References") + "\n" +
-	"- Sellke, T., Bayarri, M. J., & Berger, J. O. (2001). Calibration of _p_ values for testing precise null hypotheses. _The American Statistician, 55_(1), 62-71. https://doi.org/10.1198/000313001300339950"
+    "## " + qsTr("Assumptions") + "\n" + "- The dependent variable is continuous.\n" + "- The data are a random sample from the population.\n" + "- The residuals are normally distributed."
 	id: form
 	property int framework:	Common.Type.Framework.Classical
 
@@ -93,7 +91,17 @@ Form
 	{
 		title: qsTr("Assumption checks")
 		CheckBox { name: "normalityTest"; label: qsTr("Normality"); info: qsTr("Shapiro-Wilk test of normality.") }
-		CheckBox { name: "qqPlot";		 	label: qsTr("Q-Q plot residuals"); info: qsTr("Q-Q plot of the standardized residuals.") }
+		CheckBox 
+		{ 
+			name: "qqPlot";		 	label: qsTr("Q-Q plot residuals"); info: qsTr("Displays Q-Q plot of the standardized residuals. The confidence band shows the expected range of residuals under normality; points outside the band suggest deviations from normality.") 
+			CheckBox
+            {
+                name:               "qqPlotCi"
+                label:              qsTr("Confidence interval")
+                childrenOnSameRow:  true
+                CIField{ name: "qqPlotCiLevel" }
+            }		
+		}
 
 	}
 	Group
