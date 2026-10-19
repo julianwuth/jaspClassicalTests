@@ -28,10 +28,8 @@ Form
 		"## " + qsTr("Assumptions") + "\n" +
 		"- " + qsTr("The dependent variable is continuous.") + "\n" +
 		"- " + qsTr("The observations in both groups are a random sample from the population.") + "\n" +
-		"- " + qsTr("The dependent variable is normally distributed in each group of the independent variable.") + "\n" +
+		"- " + qsTr("The residuals are normally distributed.") + "\n" +
 		"- " + qsTr("The population variances in the two groups are homogeneous.")
-	infoBottom: "## " + qsTr("References") + "\n" +
-	"- Sellke, T., Bayarri, M. J., & Berger, J. O. (2001). Calibration of _p_ values for testing precise null hypotheses. _The American Statistician, 55_(1), 62-71. https://doi.org/10.1198/000313001300339950"
 	id: form
 	property int framework:	Common.Type.Framework.Classical
 
@@ -52,8 +50,8 @@ Form
 	Group
 	{
 		title: qsTr("Tests")
-		CheckBox { name: "student";	label: qsTr("Student"); info: qsTr("Good old fashioned t-test. Selected by default.");	 checked: true	}
-		CheckBox { name: "welch";			label: qsTr("Welch"); info: qsTr("Welch's unequal variances test. Use when the group variances cannot be assumed to be equal.");					}
+		CheckBox { name: "student";	label: qsTr("Student"); info: qsTr("Student's t-test. Assumes equal variances.");	}
+		CheckBox { name: "welch";			label: qsTr("Welch"); info: qsTr("Welch's t-test. Does not assume equal variances. Selected by default.");	 checked: true	}
 		CheckBox { name: "mannWhitneyU";	label: qsTr("Mann-Whitney"); info:qsTr("Non-parametric independent t-test. Use when the model residuals are not normally distributed.");				}
 	}
 
@@ -114,7 +112,17 @@ Form
 				RadioButton { value: "levene";			label: qsTr("Levene's") }
 			}
 		}
-		CheckBox { name: "qqPlot";		 	label: qsTr("Q-Q plot residuals"); info: qsTr("Displays Q-Q plot of the standardized residuals.") }
+		CheckBox 
+		{ 
+			name: "qqPlot";		 	label: qsTr("Q-Q plot residuals"); info: qsTr("Displays Q-Q plot of the standardized residuals. The confidence band shows the expected range of residuals under normality; points outside the band suggest deviations from normality.") 
+			CheckBox
+            {
+                name:               "qqPlotCi"
+                label:              qsTr("Confidence interval")
+                childrenOnSameRow:  true
+                CIField{ name: "qqPlotCiLevel" }
+            }		
+		}
 	}
 	Group
 	{

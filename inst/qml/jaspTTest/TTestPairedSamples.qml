@@ -25,11 +25,7 @@ import "./common" as Common
 Form
 {
 	info: qsTr("The paired samples t-test allows the user to estimate the effect size and test the null hypothesis that the population mean of the difference between observations equals 0 in dependent groups.\n") +
-	"## " + qsTr("Assumptions") + "\n" + "- The difference score is continuous.\n" + "- The difference scores are a random sample from the population.\n" + "- The difference scores are normally distributed in the population."
-	infoBottom: "## " + qsTr("References") + "\n" +
-	"- Dunlap, W. P., Cortina, J. M., Vaslow, J. B., & Burke, M. J. (1996). Meta-analysis of experiments with matched groups or repeated measures designs. _Psychological Methods, 1_(2), 170-177. https://doi.org/10.1037/1082-989X.1.2.170\n" +
-	"- Morey, R. D. (2008). Confidence intervals from normalized data: A correction to Cousineau (2005). _Tutorials in Quantitative Methods for Psychology, 4_(2), 61-64.\n" +
-	"- Sellke, T., Bayarri, M. J., & Berger, J. O. (2001). Calibration of _p_ values for testing precise null hypotheses. _The American Statistician, 55_(1), 62-71. https://doi.org/10.1198/000313001300339950"
+	"## " + qsTr("Assumptions") + "\n" + "- The difference score is continuous.\n" + "- The difference scores are a random sample from the population.\n" + "- The residuals (i.e., the difference scores) are normally distributed."
 	id: form
 	property int framework:	Common.Type.Framework.Classical
 
@@ -97,8 +93,17 @@ Form
 	{
 		title: qsTr("Assumption Checks")
 		CheckBox { name: "normalityTest";	label: qsTr("Normality"); info: qsTr("Shapiro-Wilk test of normality.") }
-		CheckBox { name: "qqPlot";		 	label: qsTr("Q-Q plot residuals"); info: qsTr("Q-Q plot of the standardized residuals.") }
-
+		CheckBox 
+		{ 
+			name: "qqPlot";		 	label: qsTr("Q-Q plot residuals"); info: qsTr("Displays Q-Q plot of the standardized residuals. The confidence band shows the expected range of residuals under normality; points outside the band suggest deviations from normality.") 
+			CheckBox
+            {
+                name:               "qqPlotCi"
+                label:              qsTr("Confidence interval")
+                childrenOnSameRow:  true
+                CIField{ name: "qqPlotCiLevel" }
+            }		
+		}
 	}
 	
 	Group
